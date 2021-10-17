@@ -89,14 +89,17 @@ class Server:
     def remove_client_from_the_server(self, client):
         if user_owns_chat_room(client):
             server.delete_chat_room(client.room)
+        client.room.remove_client_from_the_room(client, None)
         del self.userList[client.id]
-        # if not client.room.remove_client_from_the_room(client, None):
-        #     self.delete_chat_room(client.room)
-        client.conn.sendall(
-            json.dumps({"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""},
-                       ensure_ascii=False).encode(
-                'utf8') + '\n'.encode('utf8'))
-        conn.close()
+        try:
+            client.conn.sendall(
+                json.dumps({"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""},
+                           ensure_ascii=False).encode(
+                    'utf8') + '\n'.encode('utf8'))
+        except ConnectionResetError:
+            print('Client: ' + client.id + ' has been disconnected.')
+        finally:
+            conn.close()
 
     def delete_chat_room(self, chat_room):
         chat_room.about_to_delete = True
@@ -141,7 +144,7 @@ def threaded_client(conn):
             except:
                 if thread_owner is not None:
                     server.remove_client_from_the_server(thread_owner)
-                    # break
+                    break
             data = json.loads(data.decode("utf-8"))
             print(data)
 
@@ -171,7 +174,7 @@ def threaded_client(conn):
                     else:
                         print("Error occured in newidentity operation")
                         break
-            #######################################################################################################################
+
             elif data['type'] == 'list':
                 print('#list')
                 conn.sendall(
@@ -186,7 +189,6 @@ def threaded_client(conn):
                                          "owner": thread_owner.room.owner.id}, ensure_ascii=False).encode(
                     'utf8') + '\n'.encode(
                     'utf8'))
-            ###########################################################################################################################3
             elif data['type'] == 'createroom':
                 if (data['roomid'] in server.myChatRooms) or (user_owns_chat_room(thread_owner)) or (
                         not data['roomid'].isalnum()) or (
@@ -219,7 +221,6 @@ def threaded_client(conn):
                         thread_owner.join_room(server.myChatRooms[leader_response['roomid']])
                     else:
                         print("Error occured in createroom operation")
-            #######################################################################################################################
             elif data['type'] == 'joinroom':
                 if data['roomid'] not in server.all_chat_rooms_in_the_system or user_owns_chat_room(thread_owner):
                     conn.sendall(
@@ -234,7 +235,6 @@ def threaded_client(conn):
                                    ensure_ascii=False).encode(
                             'utf8') + '\n'.encode('utf8'))
                     server.remove_client_from_the_server(thread_owner)
-            #######################################################################################################################
             elif data['type'] == 'movejoin':
                 thread_owner = Client(data['identity'], conn, server.server_id)
                 server.userList[data['identity']] = thread_owner
@@ -246,7 +246,6 @@ def threaded_client(conn):
                     json.dumps({"type": "serverchange", "approved": "true", "serverid": server.server_id},
                                ensure_ascii=False).encode(
                         'utf8') + '\n'.encode('utf8'))
-            #######################################################################################################################
             elif data['type'] == 'deleteroom':
                 if not user_owns_chat_room(thread_owner):
                     conn.sendall(
@@ -255,19 +254,14 @@ def threaded_client(conn):
                             'utf8') + '\n'.encode('utf8'))
                 else:
                     server.delete_chat_room(server.myChatRooms[data['roomid']])
-
-
-
-            ################################################################################################################################
             elif data['type'] == 'message':
                 if data['content'] != '':
                     thread_owner.room.message_broadcast(data['content'], thread_owner)
-            ################################################################################################################################
             elif data['type'] == 'quit':
                 print('#quit: Client requested to close the connection')
                 if thread_owner is not None:
                     server.remove_client_from_the_server(thread_owner)
-                    # break
+                    break
             else:
                 continue
 
