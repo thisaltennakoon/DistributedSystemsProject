@@ -4,23 +4,11 @@ import socket
 import json
 from _thread import *
 
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
-ThreadCount = 0
 
-class Client:
-    def __init__(self, id, conn, server_id):
+class Owner:
+    def __init__(self, id):
         self.id = id
-        self.conn = conn
-        self.server_id = server_id
-        self.room = None
-        self.room = myChatRooms["MainHall-"+server_id].add_client(self)
 
-    def join_room(self,destination_room):
-        if self.room.remove_client(self):
-            destination_room.add_client(self)
-            return True
-        return False
 
 class ChatRoom:
     def __init__(self, name, owner, server_id):
@@ -28,48 +16,120 @@ class ChatRoom:
         self.owner = owner
         self.server_id = server_id
         self.clientList = []
+        self.about_to_delete = False
 
     def add_client(self, newClient):
         self.clientList.append(newClient)
         if newClient.room is None:
             former = ""
         else:
-            former = newClient.room
-        room_change_notification = {"type": "roomchange", "identity": newClient.id, "former": former, "roomid": self.name}
+            former = newClient.room.name
+        newClient.room = self
+        room_change_notification = {"type": "roomchange", "identity": newClient.id, "former": former,
+                                    "roomid": self.name}
         for client in self.clientList:
-            client.conn.sendall(json.dumps(room_change_notification, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
-        print("Client "+newClient.id+" added to the "+self.name+" chatroom")
+            client.conn.sendall(
+                json.dumps(room_change_notification, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+        print("Client " + newClient.id + " added to the " + self.name + " chatroom")
 
         return self
 
-    def remove_client(self, client):
+    def remove_client_from_the_room(self, client, destination_room):
         if self.owner != client:
             self.clientList.remove(client)
-            print("Client "+client.id+" has been removed from "+self.name+" chatroom")
+            if destination_room is None:
+                destination_room_name = ""
+            else:
+                destination_room_name = destination_room.name
+            room_change_notification = {"type": "roomchange", "identity": client.id, "former": self.name,
+                                        "roomid": destination_room_name}
+            for client in self.clientList:
+                client.conn.sendall(
+                    json.dumps(room_change_notification, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+            print("Client " + client.id + " has been removed from " + self.name + " chatroom")
+            return True
+        elif self.owner == client and self.about_to_delete:
+            print("Final notification from the chat room: " + self.name + " before deleting.Good Bye!")
             return True
         else:
             return False
 
-    def broadcastMessage(message):
-        print("Broadcasting message to all")
+    def message_broadcast(self, message, sent_by):
+        for client in self.clientList:
+            if client != sent_by:
+                client.conn.sendall(
+                    json.dumps({"type": "message", "identity": sent_by.id, "content": message},
+                               ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+
+    def get_client_id_list(self):
+        client_id_list = []
+        for client in self.clientList:
+            client_id_list.append(client.id)
+        return client_id_list
 
 
-def user_owns_chat_room(user_id):
-    for i in myChatRooms:
-        if i.owner == user_id:
+def user_owns_chat_room(client):
+    for i in server.myChatRooms:
+        if server.myChatRooms[i].owner == client:
             return True
     return False
 
+
+class Server:
+    def __init__(self, server_id, server_address, clients_port, coordination_port, owner):
+        self.server_id = server_id
+        self.server_address = server_address
+        self.clients_port = clients_port
+        self.coordination_port = coordination_port
+        self.userList = {}
+        self.myChatRooms = {"MainHall-" + self.server_id: ChatRoom("MainHall-" + self.server_id, owner, self.server_id)}
+        self.all_chat_rooms_in_the_system = {
+            "MainHall-" + self.server_id: self.myChatRooms["MainHall-" + self.server_id]}
+
+    def remove_client_from_the_server(self, client):
+        if user_owns_chat_room(client):
+            server.delete_chat_room(client.room)
+        del self.userList[client.id]
+        # if not client.room.remove_client_from_the_room(client, None):
+        #     self.delete_chat_room(client.room)
+        client.conn.sendall(
+            json.dumps({"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""},
+                       ensure_ascii=False).encode(
+                'utf8') + '\n'.encode('utf8'))
+        conn.close()
+
+    def delete_chat_room(self, chat_room):
+        chat_room.about_to_delete = True
+        for client in chat_room.clientList:
+            if chat_room.owner != client:
+                client.join_room(self.myChatRooms["MainHall-" + self.server_id])
+        del self.all_chat_rooms_in_the_system[chat_room.name]
+        del self.myChatRooms[chat_room.name]
+        conn.sendall(
+            json.dumps({"type": "deleteroom", "roomid": chat_room.name, "approved": "true"},
+                       ensure_ascii=False).encode(
+                'utf8') + '\n'.encode('utf8'))
+        chat_room.owner.join_room(server.myChatRooms["MainHall-" + server.server_id])
+
+
 server_id = "s1"
-userList = []  #Stores Client objects
-
-chatRoomList = {}  # {“roomid”: ”serverid”}
-myChatRooms = {"MainHall-"+server_id:ChatRoom("MainHall-"+server_id,server_id,server_id)}  # [“roomid”:[[”owner”,”serverid”],[“user1”,”user2”,”user3”,..]]]
+owner_of_the_server = Owner("")
+server = Server(server_id, '127.0.0.1', 65432, 5555, owner_of_the_server)
 
 
-# Chatservers = [“serverid”:”state”]
+class Client:
+    def __init__(self, id, conn, server_id):
+        self.id = id
+        self.conn = conn
+        self.server_id = server_id
+        self.room = None
+        self.room = server.myChatRooms["MainHall-" + server_id].add_client(self)
 
-
+    def join_room(self, destination_room):
+        if self.room.remove_client_from_the_room(self, destination_room):
+            destination_room.add_client(self)
+            return True
+        return False
 
 
 def threaded_client(conn):
@@ -80,14 +140,14 @@ def threaded_client(conn):
                 data = conn.recv(1024)
             except:
                 if thread_owner is not None:
-                    userList.remove(thread_owner)
-                    break
+                    server.remove_client_from_the_server(thread_owner)
+                    # break
             data = json.loads(data.decode("utf-8"))
             print(data)
 
             if data['type'] == 'newidentity':
-                if (data['identity'] in userList) or (not data['identity'].isalnum()) or (
-                not 3 <= len(data['identity']) <= 16):
+                if (data['identity'] in server.userList) or (not data['identity'].isalnum()) or (
+                        not 3 <= len(data['identity']) <= 16):
                     conn.sendall(json.dumps({"type": "newidentity", "approved": "false"}, ensure_ascii=False).encode(
                         'utf8') + '\n'.encode('utf8'))
                     break
@@ -106,74 +166,119 @@ def threaded_client(conn):
                     elif leader_response['approved'] == 'true':
                         conn.sendall(json.dumps({"type": "newidentity", "approved": "true"}, ensure_ascii=False).encode(
                             'utf8') + '\n'.encode('utf8'))
-                        thread_owner = Client(data['identity'],conn,server_id)
-                        userList.append(thread_owner)
+                        thread_owner = Client(data['identity'], conn, server.server_id)
+                        server.userList[data['identity']] = thread_owner
                     else:
                         print("Error occured in newidentity operation")
                         break
             #######################################################################################################################
+            elif data['type'] == 'list':
+                print('#list')
+                conn.sendall(
+                    json.dumps({"type": "roomlist", "rooms": list(server.myChatRooms.keys())},
+                               ensure_ascii=False).encode(
+                        'utf8') + '\n'.encode('utf8'))
 
+            elif data['type'] == 'who':
+                print('who')
+                conn.sendall(json.dumps({"type": "roomcontents", "roomid": thread_owner.room.name,
+                                         "identities": thread_owner.room.get_client_id_list(),
+                                         "owner": thread_owner.room.owner.id}, ensure_ascii=False).encode(
+                    'utf8') + '\n'.encode(
+                    'utf8'))
+            ###########################################################################################################################3
             elif data['type'] == 'createroom':
-                if (data['roomid'] in chatRoomList) or (user_owns_chat_room(thread_owner)) or (
-                not data['roomid'].isalnum()) or (
+                if (data['roomid'] in server.myChatRooms) or (user_owns_chat_room(thread_owner)) or (
+                        not data['roomid'].isalnum()) or (
                         not 3 <= len(data['roomid']) <= 16):
-                    conn.sendall(json.dumps({"type": "createroom", "roomid": "jokes", "approved": "false"},
+                    conn.sendall(json.dumps({"type": "createroom", "roomid": data['roomid'], "approved": "false"},
                                             ensure_ascii=False).encode(
                         'utf8') + '\n'.encode('utf8'))
                 else:
-                    # Server sends {"type" : "createroom", "roomid" : "jokes", “clientid” : “Adel”} to the leader
+                    # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
                     leader_to_all_servers = json.dumps(
-                        {"type": "createroom", "roomid": "jokes", "clientid": "Adel", "serverid": "s1",
+                        {"type": "createroom", "roomid": data['roomid'], "clientid": "Adel", "serverid": "s1",
                          "approved": "true"}, ensure_ascii=False).encode(
                         'utf8') + '\n'.encode('utf8')
                     leader_response = json.loads(leader_to_all_servers.decode("utf-8"))
                     if leader_response['approved'] == 'false':
                         conn.sendall(
-                            json.dumps({"type": "createroom", "roomid": "jokes", "approved": "false"},
+                            json.dumps({"type": "createroom", "roomid": leader_response['roomid'], "approved": "false"},
                                        ensure_ascii=False).encode(
                                 'utf8') + '\n'.encode('utf8'))
 
                     elif leader_response['approved'] == 'true':
-                        myChatRooms[leader_response['roomid']] = ChatRoom(leader_response['roomid'],thread_owner,server_id)
+                        server.myChatRooms[leader_response['roomid']] = ChatRoom(leader_response['roomid'],
+                                                                                 thread_owner, server.server_id)
+                        server.all_chat_rooms_in_the_system[leader_response['roomid']] = server.myChatRooms[
+                            leader_response['roomid']]
                         conn.sendall(
-                            json.dumps({"type": "createroom", "roomid": "jokes", "approved": "true"},
+                            json.dumps({"type": "createroom", "roomid": leader_response['roomid'], "approved": "true"},
                                        ensure_ascii=False).encode(
                                 'utf8') + '\n'.encode('utf8'))
+                        thread_owner.join_room(server.myChatRooms[leader_response['roomid']])
                     else:
                         print("Error occured in createroom operation")
+            #######################################################################################################################
+            elif data['type'] == 'joinroom':
+                if data['roomid'] not in server.all_chat_rooms_in_the_system or user_owns_chat_room(thread_owner):
+                    conn.sendall(
+                        json.dumps({"type": "roomchange", "identity": "Maria", "former": "jokes", "roomid": "jokes"},
+                                   ensure_ascii=False).encode(
+                            'utf8') + '\n'.encode('utf8'))
+                elif data['roomid'] in server.myChatRooms:
+                    thread_owner.join_room(server.myChatRooms[data['roomid']])
+                elif data['roomid'] in server.all_chat_rooms_in_the_system:
+                    conn.sendall(
+                        json.dumps({"type": "route", "roomid": "jokes", "host": "122.134.2.4", "port": "4445"},
+                                   ensure_ascii=False).encode(
+                            'utf8') + '\n'.encode('utf8'))
+                    server.remove_client_from_the_server(thread_owner)
+            #######################################################################################################################
+            elif data['type'] == 'movejoin':
+                thread_owner = Client(data['identity'], conn, server.server_id)
+                server.userList[data['identity']] = thread_owner
+                if data['roomid'] not in server.myChatRooms:
+                    thread_owner.join_room("MainHall-" + server.server_id)
+                else:
+                    thread_owner.join_room(data['roomid'])
+                conn.sendall(
+                    json.dumps({"type": "serverchange", "approved": "true", "serverid": server.server_id},
+                               ensure_ascii=False).encode(
+                        'utf8') + '\n'.encode('utf8'))
             #######################################################################################################################
             elif data['type'] == 'deleteroom':
                 if not user_owns_chat_room(thread_owner):
                     conn.sendall(
-                        json.dumps({"type" : "deleteroom", "roomid" : "jokes", "approved" : "false"},
+                        json.dumps({"type": "deleteroom", "roomid": data['roomid'], "approved": "false"},
                                    ensure_ascii=False).encode(
                             'utf8') + '\n'.encode('utf8'))
                 else:
-                    #Server sends {"type" : "deleteroom", "serverid" : "s1", "roomid" : "jokes"} to the leader and leader sends {"type" : "deleteroom", "serverid" : "s1", "roomid" : "jokes", "approved" : "true"} to all the other servers. Then all the servers deletes the particular chat room from the chatroomlist and server owning the chat room,
-                    pass
-################################################################################################################################
-            elif data['type'] == 'list':
-                print('list')
-            elif data['type'] == 'who':
-                print('who')
-                conn.sendall(json.dumps({"type": "roomcontents", "roomid": "jokes",
-                                         "identities": list(userList.keys()),
-                                         "owner": thread_owner}, ensure_ascii=False).encode('utf8') + '\n'.encode(
-                    'utf8'))
+                    server.delete_chat_room(server.myChatRooms[data['roomid']])
+
+
+
+            ################################################################################################################################
+            elif data['type'] == 'message':
+                if data['content'] != '':
+                    thread_owner.room.message_broadcast(data['content'], thread_owner)
+            ################################################################################################################################
             elif data['type'] == 'quit':
                 print('#quit: Client requested to close the connection')
                 if thread_owner is not None:
-                    del userList[thread_owner]
-                    conn.sendall(json.dumps({"type": "quit", "approved": "true"}, ensure_ascii=False).encode(
-                        'utf8') + '\n'.encode('utf8'))
-                    break
+                    server.remove_client_from_the_server(thread_owner)
+                    # break
             else:
                 continue
 
 
+# HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+# PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
+ThreadCount = 0
+
 while True:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
+        s.bind((server.server_address, server.clients_port))
         s.listen()
         conn, addr = s.accept()
         print('Connected to: ' + addr[0] + ':' + str(addr[1]))
