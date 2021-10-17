@@ -95,11 +95,12 @@ class Server:
         del self.userList[client.id]
         sendall_json(client.conn,
                      {"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""})
-        conn.close()
+        client.conn.close()
 
     def delete_chat_room(self, chat_room):
         chat_room.about_to_delete = True
-        for client in chat_room.clientList:
+        client_list_of_the_chatroom = list(chat_room.clientList)
+        for client in client_list_of_the_chatroom:
             if chat_room.owner != client:
                 client.join_room(self.myChatRooms["MainHall-" + self.server_id])
         del self.all_chat_rooms_in_the_system[chat_room.name]
