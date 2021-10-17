@@ -111,7 +111,8 @@ class Server:
 
 server_id = "s1"
 owner_of_the_server = Owner("")
-server = Server(server_id, '127.0.0.1', 65432, 5555, owner_of_the_server)
+server = Server(server_id, '34.131.6.70', 65432, 5555, owner_of_the_server)
+# server = Server(server_id, '127.0.0.1', 65432, 5555, owner_of_the_server)
 
 
 class Client:
