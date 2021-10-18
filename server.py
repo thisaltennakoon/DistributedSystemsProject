@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-
+import random
 import socket
 import json
 from _thread import *
+import argparse
 
 
 class Owner:
@@ -88,6 +89,18 @@ class Server:
         self.myChatRooms = {"MainHall-" + self.server_id: ChatRoom("MainHall-" + self.server_id, owner, self.server_id)}
         self.all_chat_rooms_in_the_system = {
             "MainHall-" + self.server_id: self.myChatRooms["MainHall-" + self.server_id]}
+
+    def run_server(self):
+        ThreadCount = 0
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((self.server_address, self.clients_port))
+                s.listen()
+                connection, addr = s.accept()
+                print('Connected to: ' + addr[0] + ':' + str(addr[1]))
+                start_new_thread(self.threaded_client, (connection,))
+                ThreadCount += 1
+                print('Thread Number: ' + str(ThreadCount))
 
     def remove_client_from_the_server(self, client):
         if self.user_owns_chat_room(client):
@@ -235,23 +248,47 @@ class Server:
                     continue
 
 
-server_id = "s1"
-owner_of_the_server = Owner("")
-server = Server(server_id, '127.0.0.1', 65432, 5555, owner_of_the_server)
-# HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-# PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
-ThreadCount = 0
+server_id = str(int(random.random() * 10000000))
+server_address = '127.0.0.1'
+clients_port = 4444
+coordination_port = 5555
 
-while True:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((server.server_address, server.clients_port))
-        s.listen()
-        connection, addr = s.accept()
-        print('Connected to: ' + addr[0] + ':' + str(addr[1]))
-        start_new_thread(server.threaded_client, (connection,))
-        ThreadCount += 1
-        print('Thread Number: ' + str(ThreadCount))
+parser = argparse.ArgumentParser()
 
-# python server.py
+# Adding optional argument
+parser.add_argument("-server_id", "--server_id", help="Server ID(Default=A Random Number)")
+parser.add_argument("-server_address", "--server_address", help="Server Address(Default=127.0.0.1)")
+parser.add_argument("-clients_port", "--clients_port", help="Clients Port(Default=4444)")
+parser.add_argument("-coordination_port", "--coordination_port", help="Coordination Port(Default=5555)")
+
+# Read arguments from command line
+args = parser.parse_args()
+
+if args.server_id:
+    server_id = args.server_id
+    print("Starting chat server: " + server_id)
+
+if args.server_address:
+    server_address = args.server_address
+    print("Server Address: " + server_address)
+
+if args.clients_port:
+    try:
+        clients_port = int(args.clients_port)
+        print("Clients Port: " + str(clients_port))
+    except ValueError:
+        print("Please enter an integer between 0-65353")
+
+if args.coordination_port:
+    try:
+        coordination_port = int(args.coordination_port)
+        print("Coordination Port: " + str(coordination_port))
+    except ValueError:
+        print("Please enter an integer between 0-65353")
+
+server = Server(server_id, server_address, clients_port, coordination_port, Owner(""))
+server.run_server()
+
+# python server.py -server_id s1 -server_address 127.0.0.1 -clients_port 4444 -coordination_port 5555
 # java -jar client.jar -h 127.0.0.1 -p 65432 -i Adel -d
-# java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 65432 -i Adel1
+# java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 4444 -i Adel1
