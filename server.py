@@ -91,7 +91,20 @@ class Server:
             "MainHall-" + self.server_id: self.myChatRooms["MainHall-" + self.server_id]}
 
     def run_server(self):
-        ThreadCount = 0
+        start_new_thread(self.client_server_tcp_handler, ())
+        server_thread_count = 0
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((self.server_address, self.coordination_port))
+                s.listen()
+                connection, addr = s.accept()
+                print('Connected to: ' + addr[0] + ':' + str(addr[1]))
+                start_new_thread(self.threaded_server, (connection,))
+                server_thread_count += 1
+                print('Thread Number: ' + str(server_thread_count))
+
+    def client_server_tcp_handler(self):
+        client_thread_count = 0
         while True:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind((self.server_address, self.clients_port))
@@ -99,8 +112,16 @@ class Server:
                 connection, addr = s.accept()
                 print('Connected to: ' + addr[0] + ':' + str(addr[1]))
                 start_new_thread(self.threaded_client, (connection,))
-                ThreadCount += 1
-                print('Thread Number: ' + str(ThreadCount))
+                client_thread_count += 1
+                print('Thread Number: ' + str(client_thread_count))
+
+    def threaded_server(self, connection):
+        with connection:
+            data = connection.recv(1024)
+            data = json.loads(data.decode("utf-8"))
+            print("from server thread", data)
+            if data['type'] == 'sayhello':
+                print("Server: " + data["sender"] + " said hello to Server: " + self.server_id)
 
     def remove_client_from_the_server(self, client):
         if self.user_owns_chat_room(client):
@@ -237,6 +258,15 @@ class Server:
                     else:
                         self.delete_chat_room(self.myChatRooms[data['roomid']])
                 elif data['type'] == 'message':
+                    if data['content'] == "$sayhello":
+                        for server_j in servers:
+                            if server_j != self.server_id:
+                                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                                    s.connect((servers[server_j][0], int(servers[server_j][2])))
+                                    s.sendall(json.dumps({"type": "sayhello", "sender": self.server_id},
+                                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                                    # data = s.recv(1024)
+                                    # s.close()
                     if data['content'] != '':
                         thread_owner.room.message_broadcast(data['content'], thread_owner)
                 elif data['type'] == 'quit':
@@ -248,47 +278,42 @@ class Server:
                     continue
 
 
-server_id = str(int(random.random() * 10000000))
-server_address = '127.0.0.1'
-clients_port = 4444
-coordination_port = 5555
+# server_id = str(int(random.random() * 10000000))
+# server_address = '127.0.0.1'
+# clients_port = 4444
+# coordination_port = 5555
 
 parser = argparse.ArgumentParser()
 
-# Adding optional argument
 parser.add_argument("-server_id", "--server_id", help="Server ID(Default=A Random Number)")
-parser.add_argument("-server_address", "--server_address", help="Server Address(Default=127.0.0.1)")
-parser.add_argument("-clients_port", "--clients_port", help="Clients Port(Default=4444)")
-parser.add_argument("-coordination_port", "--coordination_port", help="Coordination Port(Default=5555)")
+parser.add_argument("-servers_conf", "--servers_conf",
+                    help="Path to the text file containing the configuration of servers(Default=servers_conf.txt)")
 
-# Read arguments from command line
 args = parser.parse_args()
 
 if args.server_id:
     server_id = args.server_id
     print("Starting chat server: " + server_id)
 
-if args.server_address:
-    server_address = args.server_address
-    print("Server Address: " + server_address)
+if args.servers_conf:
+    servers_conf = args.servers_conf
+    print("Path to the text file containing the configuration of servers: " + servers_conf)
 
-if args.clients_port:
-    try:
-        clients_port = int(args.clients_port)
-        print("Clients Port: " + str(clients_port))
-    except ValueError:
-        print("Please enter an integer between 0-65353")
+servers_conf_file = open(servers_conf, "r")
+servers_conf = servers_conf_file.readlines()[1:]
+servers = {}
+for server_i in servers_conf:
+    a = server_i[0:-1].split("\t")
+    servers[a[0]] = a[1:]
+print(servers)
 
-if args.coordination_port:
-    try:
-        coordination_port = int(args.coordination_port)
-        print("Coordination Port: " + str(coordination_port))
-    except ValueError:
-        print("Please enter an integer between 0-65353")
-
-server = Server(server_id, server_address, clients_port, coordination_port, Owner(""))
+server = Server(server_id, servers[server_id][0], int(servers[server_id][1]), int(servers[server_id][2]), Owner(""))
 server.run_server()
 
-# python server.py -server_id s1 -server_address 127.0.0.1 -clients_port 4444 -coordination_port 5555
+# python 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\server.py' -server_id s1 -servers_conf 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\servers_conf.txt'
 # java -jar client.jar -h 127.0.0.1 -p 65432 -i Adel -d
 # java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 4444 -i Adel1
+
+# f = open("servers_conf.txt", "a")
+# f.write("serverid\tserver_address\tclients_port\tcoordination_port\ns1\tlocalhost\t4444\t5555\ns2\tlocalhost\t4445\t5556\ns3\t192.168.1.2\t4444\t5000\n")
+# f.close()
