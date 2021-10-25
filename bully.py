@@ -1,73 +1,76 @@
 import json
-import time
+import socket
 
+#servers = {'s1': ['localhost', '4444', '5555'], 's2': ['localhost', '4445', '5556'], 's3': ['localhost', '4446', '5557']}
 class Bully:
-    def __init__(self, id, serverList, election = False, leader = False):
+    def __init__(self, id, serverList, state = ""):
         self.id = id
-        self.election = election
-        self.leader = leader
+        self.state = state #coordinator, coodinated, offline, election
         self.serverList = serverList
-        self.takeoverState = False
-        self.sendToHigherState = False
 
-    def check_election(self):
-        pass
+    def setState(self, _state):
+        self.state = _state
 
+    def getState(self):
+        return self.state
+        
     def run_election(self):
-        self.election = True
+        self.setState("election")
         print("started election by the server " + str(self.id) + "\n")
         for i in (self.serverList):
-            if i > self.id:
-                self.send_election_msg(i)
+            if int(i) > int(self.id):
+                reply = self.send_election_msg(i)
                 print("Server " + str(self.id) + " sends a election message to server " + str(i) + "\n")
-                self.sendToHigherState = True
-        if (self.sendToHigherState == False):
-            self.leader = self.id
-            self.send_elected_msg
-            print("Server " + str(self.id) +" is elected as the new leader because it has the highest id\n")
-            self.election = False
-            return
-        self.sendToHigherState = False
-        time.sleep(2)
-        if (self.takeoverState == True):
-            print("Server " + str(self.id) +" gets out of the election\n") 
-            self.takeoverState == False           
-        else:
-            self.send_elected_msg()
-            print("Server " + str(self.id) +" is elected as the new leader because no one is responding to election msg\n")
-            self.leader = self.id
-            self.election = False
+                reply = json.loads(reply)
+                if(reply["type"] == "tookover"):
+                    print("Election takeover mesaage received")
+                    return
+        
+        self.send_elected_msg()
+        self.setState("coordinator")
+        print("Server " + str(self.id) +" is elected as the new leader")
         return
-            
-    def got_takeover_msg(self, id):
-        print("Server " + str(self.id) +" recieved election takeover message  by " + id + "\n")
-        self.takeoverState = True
 
+    def send_json_message(self,host,port,msg):
+        message = json.dumps(msg, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8')
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((host, port))
+            s.sendall(message)
+            reply = s.recv(4096)
+            s.close
+        except socket.error:
+            print("Error in connecting to server "+ id )
+        finally:
+            s.close()
+        return repr(reply)
 
     def send_election_msg(self, id):
-        #{"type": "elect", "serverid": self.id}
-        pass
-
-    def send_takeover_msg(self, id):
-        #{"type": "takeover", "serverid": self.id}
-        pass
+        return self.send_json_message(self.serverList[id][0],self.serverList[id][2],'{"type": "elect", "serverid": ' + self.id + '}')
 
     def send_elected_msg(self, connection): 
-        pass       
-        # try:
-        #     connection.sendall(json.dumps({"type": "newleader", "serverid": self.id}, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
-        # except(ConnectionResetError, OSError):
-        #     pass
+        for i in self.serverList:
+            self.send_json_message(self.serverList[id][0],self.serverList[id][2],'{"type": "newleader", "serverid": ' + self.id + '}')
 
-    def election_msg_recieved(self):
-        self.send_takeover_msg()
-        if(self.election == False):
-            self.run_election()
-        else:
-            print("Server " + str(self.id) +" election in progress\n")
+
+
     
-    def elected_msg_recieved(self):
-        self.election = False
+    # def listening_agent(self,msg):
+    #     if(msg["type"] == "newleader"):
+    #         self.setState("coordinated")
+    #         #return(json.dumps('{"type": "accepted"}', ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+    #     elif(msg["type"] == "elect"):
+    #         if(self.getState != "election"):
+    #             self.run_election()
+    #         #return(json.dumps('{"type": "tookover", "serverid": ' + self.id + '}', ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+    #     else:
+    #         pass
+    #         #return(json.dumps('{"type": "undefined"}', ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+
+
+    
+
+
 
 
 
