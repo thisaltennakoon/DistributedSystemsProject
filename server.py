@@ -175,7 +175,7 @@ class Server:
                         # Server sends {"type" : "newidentity", "identity" : "Adel", “serverid” : “s1”} to the leader
 
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                            s.connect((self.chat_system.servers[self.chat_system.leader][0], int(self.chat_system.servers[self.chat_system.leader][2])))
+                            s.connect((self.chat_system.servers[self.chat_system.leader].server_address, int(self.chat_system.servers[self.chat_system.leader].coordination_port)))
                             s.sendall(json.dumps({"type" : "newidentity", "identity" : data['identity'], "serverid" : self.server_id},
                                                  ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                             leader_response = json.loads(s.recv(1024).decode("utf-8"))
@@ -210,7 +210,7 @@ class Server:
                         # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
 
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                            s.connect((self.chat_system.servers[self.chat_system.leader][0], int(self.chat_system.servers[self.chat_system.leader][2])))
+                            s.connect((self.chat_system.servers[self.chat_system.leader].server_address, int(self.chat_system.servers[self.chat_system.leader].coordination_port)))
                             s.sendall(json.dumps({"type" : "createroom", "roomid" : data['roomid'], "clientid" : thread_owner.id, "serverid": thread_owner.server.server_id},
                                                  ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                             leader_response = json.loads(s.recv(1024).decode("utf-8"))
