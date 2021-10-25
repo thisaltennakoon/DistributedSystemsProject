@@ -260,7 +260,7 @@ class Server:
                                 thread_owner.about_to_change_server = True
                                 self.sendall_json(connection,
                                                   {"type": "route", "roomid": data['roomid'],
-                                                   "host": "127.0.0.1",
+                                                   "host": self.chat_rooms[data['roomid']].server.server_address,
                                                    "port": str(self.chat_rooms[data['roomid']].server.clients_port)})
                 elif data['type'] == 'movejoin':
                     w = self.user_list
