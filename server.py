@@ -124,6 +124,7 @@ class Server:
             self.delete_chat_room(client.room)
         client.room.remove_client_from_the_room(client, None)
         del self.user_list[client.id]
+        self.chat_system.send_to_other_servers({"type": "deleteidentity", "identity": client.id})
         self.sendall_json(client.connection,
                           {"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""})
         client.connection.close()
@@ -233,21 +234,16 @@ class Server:
                         else:
                             print("Error occurred in createroom operation")
                 elif data['type'] == 'joinroom':
-                    if data['roomid'] not in self.chat_rooms or self.user_owns_chat_room(
-                            thread_owner):
+                    if data['roomid'] not in self.chat_rooms or self.user_owns_chat_room(thread_owner):
                         self.sendall_json(connection,
                                           {"type": "roomchange", "identity": thread_owner.id, "former": data['roomid'],
                                            "roomid": data['roomid']})
                     elif data['roomid'] in self.chat_rooms and self.chat_rooms[data['roomid']].server==self:
                         thread_owner.join_room(self.chat_rooms[data['roomid']])
                     elif data['roomid'] in self.chat_rooms and self.chat_rooms[data['roomid']].server!=self:
-
+#################################################
                         self.sendall_json(connection,
-                                          {"type": "route", "roomid": data['roomid'], "host":
-                                              self.chat_system.servers[self.chat_system.chat_rooms[data['roomid']]][0],
-                                           "port":
-                                               self.chat_system.servers[self.chat_system.chat_rooms[data['roomid']]][
-                                                   1]})
+                                          {"type": "route", "roomid": data['roomid'], "host":self.chat_rooms[data['roomid']].server.server_address, "port": self.chat_rooms[data['roomid']].clients_port})
                         self.remove_client_from_the_server(thread_owner)
                 elif data['type'] == 'movejoin':
                     thread_owner = Client(data['identity'], connection, self.server_id)
@@ -319,7 +315,9 @@ class Server:
                          "serverid": data['serverid']})
             elif data['type'] == 'newidentity_by_leader' and data['approved'] == 'true':
                 self.user_list[data['identity']] = Client(data['identity'], None, self.chat_system.servers[data['serverid']])
-                # self.user_list[data['identity']] = data['serverid']
+                # self.user_list[data['identity']] = data['serverid'] {"type": "deleteidentity", "identity": client.id}
+            elif data['type']== 'deleteidentity':
+                del self.user_list[data['identity']]
             elif data['type'] == 'createroom':
                 if (data['roomid'] in self.chat_rooms):
                     self.sendall_json(connection,
