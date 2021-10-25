@@ -20,18 +20,19 @@ class ChatRoom:
         self.about_to_delete = False
 
     def add_client(self, newClient):
-        self.clientList.append(newClient)
-        if newClient.room is None:
-            former = ""
-        else:
-            former = newClient.room.name
-        newClient.room = self
-        room_change_notification = {"type": "roomchange", "identity": newClient.id, "former": former,
-                                    "roomid": self.name}
-        for client in self.clientList:
-            self.server.sendall_json(client.connection, room_change_notification)
-        print("Client " + newClient.id + " added to the " + self.name + " chatroom")
-        return self
+        if newClient.connection is not None:
+            self.clientList.append(newClient)
+            if newClient.room is None:
+                former = ""
+            else:
+                former = newClient.room.name
+            newClient.room = self
+            room_change_notification = {"type": "roomchange", "identity": newClient.id, "former": former,
+                                        "roomid": self.name}
+            for client in self.clientList:
+                self.server.sendall_json(client.connection, room_change_notification)
+            print("Client " + newClient.id + " added to the " + self.name + " chatroom")
+            return self
 
     def remove_client_from_the_room(self, client, destination_room):
         if self.owner != client:
@@ -193,7 +194,7 @@ class Server:
 
                 elif data['type'] == 'list':
                     print('#list')
-                    self.sendall_json(connection, {"type": "roomlist", "rooms": list(self.chat_system.chat_rooms.keys())})
+                    self.sendall_json(connection, {"type": "roomlist", "rooms": list(self.chat_rooms.keys())})
 
                 elif data['type'] == 'who':
                     print('who')
@@ -232,14 +233,14 @@ class Server:
                         else:
                             print("Error occurred in createroom operation")
                 elif data['type'] == 'joinroom':
-                    if (data['roomid'] not in self.chat_system.chat_rooms and data['roomid'] not in self.chat_rooms) or self.user_owns_chat_room(
+                    if data['roomid'] not in self.chat_rooms or self.user_owns_chat_room(
                             thread_owner):
                         self.sendall_json(connection,
                                           {"type": "roomchange", "identity": thread_owner.id, "former": data['roomid'],
                                            "roomid": data['roomid']})
-                    elif data['roomid'] in self.chat_rooms:
+                    elif data['roomid'] in self.chat_rooms and self.chat_rooms[data['roomid']].server==self:
                         thread_owner.join_room(self.chat_rooms[data['roomid']])
-                    elif data['roomid'] in self.chat_system.chat_rooms:
+                    elif data['roomid'] in self.chat_rooms and self.chat_rooms[data['roomid']].server!=self:
 
                         self.sendall_json(connection,
                                           {"type": "route", "roomid": data['roomid'], "host":
@@ -302,12 +303,14 @@ class Server:
                 self.chat_system.leader = data["leader"]
                 print("Server: " + data["sender"] + " said Server: " + data["leader"] + " is the new leader")
             elif data['type'] == 'newidentity':
-                if (data['identity'] in self.chat_system.user_list):
+                if (data['identity'] in self.user_list):
                     self.sendall_json(connection,
                                       {"type": "newidentity", "identity": data['identity'], "approved": "false",
                                        "serverid": data['serverid']})
                 else:
-                    self.chat_system.user_list[data['identity']] = data['serverid']
+
+                    # {"type": "newidentity", "identity": data['identity'], "serverid": self.server_id}
+                    self.user_list[data['identity']] = Client(data['identity'], None, self.chat_system.servers[data['serverid']])
                     self.sendall_json(connection,
                                       {"type": "newidentity", "identity": data['identity'], "approved": "true",
                                        "serverid": data['serverid']})
@@ -315,15 +318,16 @@ class Server:
                         {"type": "newidentity_by_leader", "identity": data['identity'], "approved": "true",
                          "serverid": data['serverid']})
             elif data['type'] == 'newidentity_by_leader' and data['approved'] == 'true':
-                self.chat_system.user_list[data['identity']] = data['serverid']
-                self.user_list[data['identity']] = data['serverid']
+                self.user_list[data['identity']] = Client(data['identity'], None, self.chat_system.servers[data['serverid']])
+                # self.user_list[data['identity']] = data['serverid']
             elif data['type'] == 'createroom':
-                if (data['roomid'] in self.chat_system.chat_rooms):
+                if (data['roomid'] in self.chat_rooms):
                     self.sendall_json(connection,
                                       {"type": "createroom", "roomid": data['roomid'], "clientid": data['clientid'],
                                        "serverid": data['serverid'], "approved": "false"})
                 else:
-                    self.chat_system.chat_rooms[data['roomid']] = data['serverid']
+
+                    self.chat_rooms[data['roomid']] = ChatRoom(data['roomid'],self.chat_system.servers[data['serverid']].owner, self.chat_system.servers[data['serverid']])
                     self.sendall_json(connection,
                                       {"type": "createroom", "roomid": data['roomid'], "clientid": data['clientid'],
                                        "serverid": data['serverid'], "approved": "true"})
@@ -331,10 +335,10 @@ class Server:
                         {"type": "createroom_by_leader", "roomid": data['roomid'], "clientid": data['clientid'],
                          "serverid": data['serverid'], "approved": "true"})
             elif data['type'] == 'createroom_by_leader' and data['approved'] == 'true':
-                self.chat_system.chat_rooms[data['roomid']] = data['serverid']
+                self.chat_rooms[data['roomid']] = ChatRoom(data['roomid'],self.chat_system.servers[data['serverid']].owner, self.chat_system.servers[data['serverid']])
                 # self.chat_rooms[data['roomid']] = data['serverid']
             elif data['type'] == 'deleteroom':
-                del self.chat_system.chat_rooms[data['roomid']]
+                del self.chat_rooms[data['roomid']]
 
 
 class ChatSystem:
