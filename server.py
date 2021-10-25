@@ -12,10 +12,10 @@ class Owner:
 
 
 class ChatRoom:
-    def __init__(self, name, owner, server_id):
+    def __init__(self, name, owner, server):
         self.name = name
         self.owner = owner
-        self.server_id = server_id
+        self.server = server
         self.clientList = []
         self.about_to_delete = False
 
@@ -29,7 +29,7 @@ class ChatRoom:
         room_change_notification = {"type": "roomchange", "identity": newClient.id, "former": former,
                                     "roomid": self.name}
         for client in self.clientList:
-            server.sendall_json(client.connection, room_change_notification)
+            self.server.sendall_json(client.connection, room_change_notification)
         print("Client " + newClient.id + " added to the " + self.name + " chatroom")
         return self
 
@@ -43,7 +43,7 @@ class ChatRoom:
             room_change_notification = {"type": "roomchange", "identity": client.id, "former": self.name,
                                         "roomid": destination_room_name}
             for client in self.clientList:
-                server.sendall_json(client.connection, room_change_notification)
+                self.server.sendall_json(client.connection, room_change_notification)
             print("Client " + client.id + " has been removed from " + self.name + " chatroom")
             return True
         elif self.owner == client and self.about_to_delete:
@@ -55,7 +55,7 @@ class ChatRoom:
     def message_broadcast(self, message, sent_by):
         for client in self.clientList:
             if client != sent_by:
-                server.sendall_json(client.connection, {"type": "message", "identity": sent_by.id, "content": message})
+                self.server.sendall_json(client.connection, {"type": "message", "identity": sent_by.id, "content": message})
 
     def get_client_id_list(self):
         client_id_list = []
@@ -65,12 +65,12 @@ class ChatRoom:
 
 
 class Client:
-    def __init__(self, id, connection, server_id):
+    def __init__(self, id, connection, server):
         self.id = id
         self.connection = connection
-        self.server_id = server_id
+        self.server = server
         self.room = None
-        self.room = server.myChatRooms["MainHall-" + server_id].add_client(self)
+        self.room = server.chat_rooms["MainHall-" + self.server.server_id].add_client(self)
 
     def join_room(self, destination_room):
         if self.room.remove_client_from_the_room(self, destination_room):
@@ -80,15 +80,17 @@ class Client:
 
 
 class Server:
-    def __init__(self, server_id, server_address, clients_port, coordination_port, owner):
+    def __init__(self, server_id, server_address, clients_port, coordination_port, owner, chat_system):
         self.server_id = server_id
         self.server_address = server_address
         self.clients_port = clients_port
         self.coordination_port = coordination_port
-        self.userList = {}
-        self.myChatRooms = {"MainHall-" + self.server_id: ChatRoom("MainHall-" + self.server_id, owner, self.server_id)}
-        self.all_chat_rooms_in_the_system = {
-            "MainHall-" + self.server_id: self.myChatRooms["MainHall-" + self.server_id]}
+        self.chat_system = chat_system
+        self.user_list = chat_system.user_list
+        self.chat_rooms = chat_system.chat_rooms
+        self.owner = owner
+        self.chat_rooms["MainHall-" + self.server_id] = ChatRoom("MainHall-" + self.server_id, owner, self)
+
 
     def run_server(self):
         start_new_thread(self.client_server_tcp_handler, ())
@@ -115,19 +117,12 @@ class Server:
                 client_thread_count += 1
                 print('Thread Number: ' + str(client_thread_count))
 
-    def threaded_server(self, connection):
-        with connection:
-            data = connection.recv(1024)
-            data = json.loads(data.decode("utf-8"))
-            print("from server thread", data)
-            if data['type'] == 'sayhello':
-                print("Server: " + data["sender"] + " said hello to Server: " + self.server_id)
 
     def remove_client_from_the_server(self, client):
         if self.user_owns_chat_room(client):
             self.delete_chat_room(client.room)
         client.room.remove_client_from_the_room(client, None)
-        del self.userList[client.id]
+        del self.user_list[client.id]
         self.sendall_json(client.connection,
                           {"type": "roomchange", "identity": client.id, "former": client.room.name, "roomid": ""})
         client.connection.close()
@@ -137,16 +132,18 @@ class Server:
         client_list_of_the_chatroom = list(chat_room.clientList)
         for client in client_list_of_the_chatroom:
             if chat_room.owner != client:
-                client.join_room(self.myChatRooms["MainHall-" + self.server_id])
-        del self.all_chat_rooms_in_the_system[chat_room.name]
-        del self.myChatRooms[chat_room.name]
+                client.join_room(self.chat_rooms["MainHall-" + self.server_id])
+        # del self.all_chat_rooms_in_the_system[chat_room.name]
+        del self.chat_rooms[chat_room.name]
+        # del self.chat_system.chat_rooms[chat_room.name]
+        self.chat_system.send_to_other_servers({"type": "deleteroom", "roomid": chat_room.name})
         self.sendall_json(chat_room.owner.connection,
                           {"type": "deleteroom", "roomid": chat_room.name, "approved": "true"})
-        chat_room.owner.join_room(self.myChatRooms["MainHall-" + self.server_id])
+        chat_room.owner.join_room(self.chat_rooms["MainHall-" + self.server_id])
 
     def user_owns_chat_room(self, client):
-        for i in self.myChatRooms:
-            if self.myChatRooms[i].owner == client:
+        for i in self.chat_rooms:
+            if self.chat_rooms[i].owner == client:
                 return True
         return False
 
@@ -170,31 +167,33 @@ class Server:
                 print(data)
 
                 if data['type'] == 'newidentity':
-                    if (data['identity'] in self.userList) or (not data['identity'].isalnum()) or (
+                    if (data['identity'] in self.user_list) or (not data['identity'].isalnum()) or (
                             not 3 <= len(data['identity']) <= 16):
                         self.sendall_json(connection, {"type": "newidentity", "approved": "false"})
                         break
                     else:
                         # Server sends {"type" : "newidentity", "identity" : "Adel", “serverid” : “s1”} to the leader
-                        leader_to_all_servers = json.dumps(
-                            {"type": "newidentity", "identity": "Adel", "approved": "true", "serverid": "s1"},
-                            ensure_ascii=False).encode(
-                            'utf8') + '\n'.encode('utf8')
-                        leader_response = json.loads(leader_to_all_servers.decode("utf-8"))
-                        if leader_response['approved'] == 'false':
-                            self.sendall_json(connection, {"type": "newidentity", "approved": "false"})
-                            break
-                        elif leader_response['approved'] == 'true':
-                            self.sendall_json(connection, {"type": "newidentity", "approved": "true"})
-                            thread_owner = Client(data['identity'], connection, self.server_id)
-                            self.userList[data['identity']] = thread_owner
-                        else:
-                            print("Error occurred in newidentity operation")
-                            break
+
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.connect((self.chat_system.servers[self.chat_system.leader][0], int(self.chat_system.servers[self.chat_system.leader][2])))
+                            s.sendall(json.dumps({"type" : "newidentity", "identity" : data['identity'], "serverid" : self.server_id},
+                                                 ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                            leader_response = json.loads(s.recv(1024).decode("utf-8"))
+                            if leader_response['approved'] == 'false':
+                                self.sendall_json(connection, {"type": "newidentity", "approved": "false"})
+                                break
+                            elif leader_response['approved'] == 'true':
+                                self.sendall_json(connection, {"type": "newidentity", "approved": "true"})
+                                thread_owner = Client(data['identity'], connection, self)
+                                self.user_list[data['identity']] = thread_owner
+
+                            else:
+                                print("Error occurred in newidentity operation")
+                                break
 
                 elif data['type'] == 'list':
                     print('#list')
-                    self.sendall_json(connection, {"type": "roomlist", "rooms": list(self.myChatRooms.keys())})
+                    self.sendall_json(connection, {"type": "roomlist", "rooms": list(self.chat_system.chat_rooms.keys())})
 
                 elif data['type'] == 'who':
                     print('who')
@@ -202,50 +201,57 @@ class Server:
                                                    "identities": thread_owner.room.get_client_id_list(),
                                                    "owner": thread_owner.room.owner.id})
                 elif data['type'] == 'createroom':
-                    if (data['roomid'] in self.myChatRooms) or (self.user_owns_chat_room(thread_owner)) or (
+                    if (data['roomid'] in self.chat_rooms) or (self.user_owns_chat_room(thread_owner)) or (
                             not data['roomid'].isalnum()) or (
                             not 3 <= len(data['roomid']) <= 16):
                         self.sendall_json(connection,
                                           {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
                     else:
                         # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
-                        leader_to_all_servers = json.dumps(
-                            {"type": "createroom", "roomid": data['roomid'], "clientid": "Adel", "serverid": "s1",
-                             "approved": "true"}, ensure_ascii=False).encode(
-                            'utf8') + '\n'.encode('utf8')
-                        leader_response = json.loads(leader_to_all_servers.decode("utf-8"))
+
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.connect((self.chat_system.servers[self.chat_system.leader][0], int(self.chat_system.servers[self.chat_system.leader][2])))
+                            s.sendall(json.dumps({"type" : "createroom", "roomid" : data['roomid'], "clientid" : thread_owner.id, "serverid": thread_owner.server.server_id},
+                                                 ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                            leader_response = json.loads(s.recv(1024).decode("utf-8"))
+
                         if leader_response['approved'] == 'false':
                             self.sendall_json(connection,
                                               {"type": "createroom", "roomid": leader_response['roomid'],
                                                "approved": "false"})
 
                         elif leader_response['approved'] == 'true':
-                            self.myChatRooms[leader_response['roomid']] = ChatRoom(leader_response['roomid'],
-                                                                                   thread_owner, self.server_id)
-                            self.all_chat_rooms_in_the_system[leader_response['roomid']] = self.myChatRooms[
-                                leader_response['roomid']]
+                            self.chat_rooms[leader_response['roomid']] = ChatRoom(leader_response['roomid'],
+                                                                                   thread_owner, self)
+                            # self.all_chat_rooms_in_the_system[leader_response['roomid']] = self.chat_rooms[
+                            #     leader_response['roomid']]
                             self.sendall_json(connection,
                                               {"type": "createroom", "roomid": leader_response['roomid'],
                                                "approved": "true"})
-                            thread_owner.join_room(self.myChatRooms[leader_response['roomid']])
+                            thread_owner.join_room(self.chat_rooms[leader_response['roomid']])
                         else:
                             print("Error occurred in createroom operation")
                 elif data['type'] == 'joinroom':
-                    if data['roomid'] not in self.all_chat_rooms_in_the_system or self.user_owns_chat_room(
+                    if (data['roomid'] not in self.chat_system.chat_rooms and data['roomid'] not in self.chat_rooms) or self.user_owns_chat_room(
                             thread_owner):
                         self.sendall_json(connection,
-                                          {"type": "roomchange", "identity": "Maria", "former": "jokes",
-                                           "roomid": "jokes"})
-                    elif data['roomid'] in self.myChatRooms:
-                        thread_owner.join_room(self.myChatRooms[data['roomid']])
-                    elif data['roomid'] in self.all_chat_rooms_in_the_system:
+                                          {"type": "roomchange", "identity": thread_owner.id, "former": data['roomid'],
+                                           "roomid": data['roomid']})
+                    elif data['roomid'] in self.chat_rooms:
+                        thread_owner.join_room(self.chat_rooms[data['roomid']])
+                    elif data['roomid'] in self.chat_system.chat_rooms:
+
                         self.sendall_json(connection,
-                                          {"type": "route", "roomid": "jokes", "host": "122.134.2.4", "port": "4445"})
+                                          {"type": "route", "roomid": data['roomid'], "host":
+                                              self.chat_system.servers[self.chat_system.chat_rooms[data['roomid']]][0],
+                                           "port":
+                                               self.chat_system.servers[self.chat_system.chat_rooms[data['roomid']]][
+                                                   1]})
                         self.remove_client_from_the_server(thread_owner)
                 elif data['type'] == 'movejoin':
                     thread_owner = Client(data['identity'], connection, self.server_id)
-                    self.userList[data['identity']] = thread_owner
-                    if data['roomid'] not in self.myChatRooms:
+                    self.user_list[data['identity']] = thread_owner
+                    if data['roomid'] not in self.chat_rooms:
                         thread_owner.join_room("MainHall-" + self.server_id)
                     else:
                         thread_owner.join_room(data['roomid'])
@@ -256,19 +262,27 @@ class Server:
                         self.sendall_json(connection,
                                           {"type": "deleteroom", "roomid": data['roomid'], "approved": "false"})
                     else:
-                        self.delete_chat_room(self.myChatRooms[data['roomid']])
+                        self.delete_chat_room(self.chat_rooms[data['roomid']])
                 elif data['type'] == 'message':
-                    if data['content'] == "$sayhello":
-                        for server_j in servers:
-                            if server_j != self.server_id:
-                                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                                    s.connect((servers[server_j][0], int(servers[server_j][2])))
-                                    s.sendall(json.dumps({"type": "sayhello", "sender": self.server_id},
-                                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
-                                    # data = s.recv(1024)
-                                    # s.close()
-                    if data['content'] != '':
-                        thread_owner.room.message_broadcast(data['content'], thread_owner)
+                    if data['content'] != '' and data['content'][0] == "$":
+                        if data['content'] == "$sayhello":
+                            for server_j in self.chat_system.servers:
+                                if server_j != self.server_id:
+                                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                                        s.connect((self.chat_system.servers[server_j][0], int(self.chat_system.servers[server_j][2])))
+                                        s.sendall(json.dumps({"type": "sayhello", "sender": self.server_id},
+                                                             ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                        elif data['content'] == "$betheleader":
+                            for server_j in self.chat_system.servers:
+                                if server_j != self.server_id:
+                                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                                        s.connect((self.chat_system.servers[server_j][0], int(self.chat_system.servers[server_j][2])))
+                                        s.sendall(json.dumps({"type": "leader_election", "leader": self.server_id},
+                                                             ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                            self.is_leader = self.server_id
+                    else:
+                        if data['content'] != '':
+                            thread_owner.room.message_broadcast(data['content'], thread_owner)
                 elif data['type'] == 'quit':
                     print('#quit: Client requested to close the connection')
                     if thread_owner is not None:
@@ -277,40 +291,106 @@ class Server:
                 else:
                     continue
 
+    def threaded_server(self, connection):
+        with connection:
+            data = connection.recv(1024)
+            data = json.loads(data.decode("utf-8"))
+            print("from server thread", data)
+            if data['type'] == 'sayhello':
+                print("Server: " + data["sender"] + " said hello to Server: " + self.server_id)
+            elif data['type'] == 'leader_election':
+                self.chat_system.leader = data["leader"]
+                print("Server: " + data["sender"] + " said Server: " + data["leader"] + " is the new leader")
+            elif data['type'] == 'newidentity':
+                if (data['identity'] in self.chat_system.user_list):
+                    self.sendall_json(connection,
+                                      {"type": "newidentity", "identity": data['identity'], "approved": "false",
+                                       "serverid": data['serverid']})
+                else:
+                    self.chat_system.user_list[data['identity']] = data['serverid']
+                    self.sendall_json(connection,
+                                      {"type": "newidentity", "identity": data['identity'], "approved": "true",
+                                       "serverid": data['serverid']})
+                    self.chat_system.send_to_other_servers(
+                        {"type": "newidentity_by_leader", "identity": data['identity'], "approved": "true",
+                         "serverid": data['serverid']})
+            elif data['type'] == 'newidentity_by_leader' and data['approved'] == 'true':
+                self.chat_system.user_list[data['identity']] = data['serverid']
+                self.user_list[data['identity']] = data['serverid']
+            elif data['type'] == 'createroom':
+                if (data['roomid'] in self.chat_system.chat_rooms):
+                    self.sendall_json(connection,
+                                      {"type": "createroom", "roomid": data['roomid'], "clientid": data['clientid'],
+                                       "serverid": data['serverid'], "approved": "false"})
+                else:
+                    self.chat_system.chat_rooms[data['roomid']] = data['serverid']
+                    self.sendall_json(connection,
+                                      {"type": "createroom", "roomid": data['roomid'], "clientid": data['clientid'],
+                                       "serverid": data['serverid'], "approved": "true"})
+                    self.chat_system.send_to_other_servers(
+                        {"type": "createroom_by_leader", "roomid": data['roomid'], "clientid": data['clientid'],
+                         "serverid": data['serverid'], "approved": "true"})
+            elif data['type'] == 'createroom_by_leader' and data['approved'] == 'true':
+                self.chat_system.chat_rooms[data['roomid']] = data['serverid']
+                # self.chat_rooms[data['roomid']] = data['serverid']
+            elif data['type'] == 'deleteroom':
+                del self.chat_system.chat_rooms[data['roomid']]
 
-# server_id = str(int(random.random() * 10000000))
-# server_address = '127.0.0.1'
-# clients_port = 4444
-# coordination_port = 5555
 
-parser = argparse.ArgumentParser()
+class ChatSystem:
+    def __init__(self):
+        self.servers = {}
+        self.user_list = {}
+        self.chat_rooms = {}
+        self.leader = None
+        self.this_server_id = self.identify_servers()
+        self.server = self.servers[self.this_server_id]
+        self.elect_leader()
+        self.server.run_server()
 
-parser.add_argument("-server_id", "--server_id", help="Server ID(Default=A Random Number)")
-parser.add_argument("-servers_conf", "--servers_conf",
-                    help="Path to the text file containing the configuration of servers(Default=servers_conf.txt)")
 
-args = parser.parse_args()
+    def identify_servers(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-server_id", "--server_id", help="Server ID(Default=A Random Number)")
+        parser.add_argument("-servers_conf", "--servers_conf",
+                            help="Path to the text file containing the configuration of servers(Default=servers_conf.txt)")
+        args = parser.parse_args()
 
-if args.server_id:
-    server_id = args.server_id
-    print("Starting chat server: " + server_id)
+        if args.server_id:
+            server_id = args.server_id
+            print("Starting chat server: " + server_id)
 
-if args.servers_conf:
-    servers_conf = args.servers_conf
-    print("Path to the text file containing the configuration of servers: " + servers_conf)
+        if args.servers_conf:
+            servers_conf = args.servers_conf
+            print("Path to the text file containing the configuration of servers: " + servers_conf)
 
-servers_conf_file = open(servers_conf, "r")
-servers_conf = servers_conf_file.readlines()[1:]
-servers = {}
-for server_i in servers_conf:
-    a = server_i[0:-1].split("\t")
-    servers[a[0]] = a[1:]
-print(servers)
+        servers_conf_file = open(servers_conf, "r")
+        servers_conf = servers_conf_file.readlines()[1:]
+        for server_i in servers_conf:
+            a = server_i[0:-1].split("\t")
+            server_j = Server(a[0], a[1], int(a[2]), int(a[3]), Owner(""), self)
+            self.servers[a[0]] = server_j
+            self.chat_rooms["MainHall-" + a[0]] = ChatRoom("MainHall-" + a[0], server_j.owner, server_j)
+        print(self.servers)
+        return server_id
 
-server = Server(server_id, servers[server_id][0], int(servers[server_id][1]), int(servers[server_id][2]), Owner(""))
-server.run_server()
+    def elect_leader(self):
+        self.leader = "s1"
+        try:
+            self.send_to_other_servers({"type": "leader_election", "leader": self.leader, "sender": self.this_server_id})
+        except(ConnectionRefusedError):
+            pass
 
-# python 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\server.py' -server_id s1 -servers_conf 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\servers_conf.txt'
+    def send_to_other_servers(self, payload):
+        for server_j in self.servers:
+            if server_j != self.this_server_id:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((self.servers[server_j].server_address, int(self.servers[server_j].coordination_port)))
+                    s.sendall(json.dumps(payload,
+                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+chat_system = ChatSystem()
+# server_id, server_address, clients_port, coordination_port, owner, chat_system):
+# python 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\server.py' -server_id s2 -servers_conf 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\servers_conf.txt'
 # java -jar client.jar -h 127.0.0.1 -p 65432 -i Adel -d
 # java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 4444 -i Adel1
 
