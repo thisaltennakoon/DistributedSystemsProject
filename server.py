@@ -269,7 +269,7 @@ class Server:
                             for server_j in self.chat_system.servers:
                                 if server_j != self.server_id:
                                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                                        s.connect((self.chat_system.servers[server_j][0], int(self.chat_system.servers[server_j][2])))
+                                        s.connect((self.chat_system.servers[server_j].server_address, int(self.chat_system.servers[server_j].coordination_port)))
                                         s.sendall(json.dumps({"type": "sayhello", "sender": self.server_id},
                                                              ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                         elif data['content'] == "$betheleader":
