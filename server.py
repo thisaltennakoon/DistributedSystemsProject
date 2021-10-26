@@ -166,10 +166,7 @@ class Server:
                     data = connection.recv(1024)
                 except:
                     if thread_owner is not None:
-                        if not thread_owner.about_to_change_server:
-                            self.remove_client_from_the_server(thread_owner)
-                        else:
-                            thread_owner.about_to_change_server = False
+                        self.remove_client_from_the_server(thread_owner)
                         break
                 if data:
                     data = json.loads(data.decode("utf-8"))
@@ -200,8 +197,6 @@ class Server:
                                 self.sendall_json(connection, {"type": "newidentity", "approved": "true"})
                                 self.chat_system.add_user(Client(data['identity'], connection, self))
                                 thread_owner = self.chat_system.get_user(data['identity'])
-
-
                             else:
                                 print("Error occurred in newidentity operation")
                                 break
@@ -259,16 +254,14 @@ class Server:
                         a = requested_chat_room
                         thread_owner.join_room(requested_chat_room)
                     elif requested_chat_room and requested_chat_room.server != self:
-                        # while not thread_owner.room:
-                        #     time.sleep(1)
-
                         current_room = self.chat_system.get_chat_room(thread_owner.room.name)
                         self.chat_system.increase_vector_clock()
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                             s.connect((self.chat_system.servers[self.chat_system.leader].server_address,
                                        int(self.chat_system.servers[self.chat_system.leader].coordination_port)))
                             s.sendall(json.dumps({"type": "changeserver", "currentserver": self.server_id,
-                                                  "destinationserver": data['roomid'], "identity": thread_owner.id, "vector_clock": str(self.chat_system.get_vector_clock())},
+                                                  "destinationserver": data['roomid'], "identity": thread_owner.id,
+                                                  "vector_clock": str(self.chat_system.get_vector_clock())},
                                                  ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                             leader_response = json.loads(s.recv(1024).decode("utf-8"))
                             self.chat_system.increase_vector_clock(eval(leader_response['vector_clock']))
@@ -291,7 +284,6 @@ class Server:
                     self.chat_system.increase_vector_clock()
                     thread_owner = self.chat_system.get_user(data['identity'])
                     self.chat_system.increase_vector_clock()
-                    # thread_owner = self.user_list[data['identity']]
                     thread_owner.connection = connection
                     thread_owner.server = self
                     self.chat_system.increase_vector_clock()
@@ -311,8 +303,6 @@ class Server:
                     self.sendall_json(connection,
                                       {"type": "serverchange", "approved": "true", "serverid": self.server_id})
                     self.chat_system.increase_vector_clock()
-                    # while not thread_owner.room:
-                    #     time.sleep(1)
                     if thread_owner.room:
                         for client in thread_owner.room.clientList:
                             self.chat_system.increase_vector_clock()
@@ -320,8 +310,6 @@ class Server:
                                                                   "former": data['former'],
                                                                   "roomid": thread_owner.room.name})
                     self.chat_system.increase_vector_clock()
-                    b = thread_owner.room
-                    c = 5
                 elif data['type'] == 'deleteroom':
                     if not self.user_owns_chat_room(thread_owner):
                         self.sendall_json(connection,
@@ -393,7 +381,6 @@ class Server:
 
             elif data['type'] == 'deleteidentity':
                 self.chat_system.delete_user(self.chat_system.get_user(data['identity']))
-                # del self.chat_system.user_list[data['identity']]
             elif data['type'] == 'createroom':
                 requested_chat_room = self.chat_system.get_chat_room(data['roomid'])  # gives False or chatroom
                 if (requested_chat_room):
@@ -418,8 +405,7 @@ class Server:
                                                         self.chat_system.servers[data['serverid']]))
 
             elif data['type'] == 'deleteroom':
-                self.chat_system.delete_chat_room(get_chat_room(data['roomid']))
-                # self.chat_system.delete_chat_room(data['roomid'])
+                self.chat_system.delete_chat_room(self.chat_system.get_chat_room(data['roomid']))
 
             elif data['type'] == 'changeserver':
                 self.chat_system.increase_vector_clock(eval(data['vector_clock']))
@@ -427,22 +413,21 @@ class Server:
                     requested_user = self.chat_system.get_user(data['identity'])
                     requested_user.room = None
                     requested_user.server = None
-                # self.user_list[data['identity']].room = None
-                # self.user_list[data['identity']].server = None
                 self.chat_system.increase_vector_clock()
                 self.sendall_json(connection, {"type": "changeserver", "currentserver": data['currentserver'],
-                                               "destinationserver": data['destinationserver'], "approved": "true","vector_clock": str(self.chat_system.get_vector_clock())})
+                                               "destinationserver": data['destinationserver'], "approved": "true",
+                                               "vector_clock": str(self.chat_system.get_vector_clock())})
                 self.chat_system.increase_vector_clock()
                 self.chat_system.send_to_other_servers(
                     {"type": "changeserver_by_leader", "currentserver": data['currentserver'],
                      "destinationserver": data['destinationserver'], "approved": "true",
-                     "identity": data['identity']},[data['currentserver']])
+                     "identity": data['identity']}, [data['currentserver']])
                 print("changeserver request from " + data['currentserver'] + " to " + data[
                     'destinationserver'] + " by " + data['identity'])
 
             elif data['type'] == 'changeserver_by_leader':
                 self.chat_system.increase_vector_clock(eval(data['vector_clock']))
-                if self.chat_system.compare_vector_clock(dict(data['vector_clock'])):
+                if self.chat_system.compare_vector_clock(eval(data['vector_clock'])):
                     requested_user = self.chat_system.get_user(data['identity'])
                     requested_user.room = None
                     requested_user.server = None
@@ -483,8 +468,7 @@ class ChatSystem:
             server_j = Server(a[0], a[1], int(a[2]), int(a[3]), Owner(""), self)
             self.servers[a[0]] = server_j
             self.add_chat_room(ChatRoom("MainHall-" + a[0], server_j.owner, server_j))
-            self.vector_clock[a[0]]=0
-            # self.chat_rooms["MainHall-" + a[0]] = ChatRoom("MainHall-" + a[0], server_j.owner, server_j)
+            self.vector_clock[a[0]] = 0
         print(self.servers)
         return server_id
 
@@ -519,19 +503,19 @@ class ChatSystem:
 
     def increase_vector_clock(self, array={}):
         with threading.Lock():
-            print('Old Vector Clock ',self.get_vector_clock())
-            self.vector_clock[self.this_server_id]=self.vector_clock[self.this_server_id]+1
+            print('Old Vector Clock ', self.get_vector_clock())
+            self.vector_clock[self.this_server_id] = self.vector_clock[self.this_server_id] + 1
             for i in array:
-                if i!=self.this_server_id:
-                    self.vector_clock[i]=max(self.vector_clock[i],array[i])
-            print('New Vector Clock ',self.get_vector_clock)
+                if i != self.this_server_id:
+                    self.vector_clock[i] = max(self.vector_clock[i], array[i])
+            print('New Vector Clock ', self.get_vector_clock)
 
     def compare_vector_clock(self, array):
         with threading.Lock():
             print('System Vector Clock ', self.get_vector_clock())
             print('Received Vector Clock ', array)
             for i in array:
-                if array[i]>=self.vector_clock[i]:
+                if array[i] >= self.vector_clock[i]:
                     continue
                 else:
                     return False
@@ -589,11 +573,7 @@ class ChatSystem:
 
 
 chat_system = ChatSystem()
-# server_id, server_address, clients_port, coordination_port, owner, chat_system):
-# python 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\server.py' -server_id s1 -servers_conf "C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\servers_conf.txt"
-# java -jar client.jar -h 127.0.0.1 -p 65432 -i Adel -d
-# java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 4444 -i Adel1
 
-# f = open("servers_conf.txt", "a")
-# f.write("serverid\tserver_address\tclients_port\tcoordination_port\ns1\tlocalhost\t4444\t5555\ns2\tlocalhost\t4445\t5556\ns3\t192.168.1.2\t4444\t5000\n")
-# f.close()
+# python 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\server.py' -server_id s1 -servers_conf "C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\servers_conf.txt"
+
+# java -jar 'C:\Users\thisa\Desktop\Sem 7\Distributed Systems\project\DistributedSystemsProject\client.jar' -h 127.0.0.1 -p 4444 -i Adel1
