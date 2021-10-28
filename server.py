@@ -227,10 +227,8 @@ class Server:
                                             "Error occurred in newidentity operation")
                                         break
                             except socket.error as e:
-                                #oldleader = self.chat_system.leader
-                                #self.chat_system.send_to_other_servers({'type':'deleteserver','serverid':oldleader},[oldleader,self.server_id])
-                                #self.chat_system.servers.pop(oldleader)
                                 self.bully.run_election()
+                                
                 elif data['type'] == 'list':
                     print('#list')
                     self.sendall_json(connection,
@@ -242,13 +240,13 @@ class Server:
                                                    "identities": thread_owner.room.get_client_id_list(),
                                                    "owner": thread_owner.room.owner.id})
                 elif data['type'] == 'createroom':
-                    if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
+                    if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (            #new change try execpt added to 252 with a wait. removed middle breaks
                             not data['roomid'].isalnum()) or (
                                 not 3 <= len(data['roomid']) <= 16):
                             self.sendall_json(connection,
                                 {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
                     else:
-                        wait = True
+                        wait = True                          
                         while(wait):
                             try:
                                 # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
@@ -261,7 +259,7 @@ class Server:
                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                                     leader_response = json.loads(
                                         s.recv(1024).decode("utf-8"))
-                                    wait = False
+                                    wait = False                                                               #new change 
                                 if leader_response['approved'] == 'false':
                                     self.sendall_json(connection,
                                                     {"type": "createroom", "roomid": leader_response['roomid'],
@@ -562,8 +560,8 @@ class ChatSystem:
             eliminate.append(self.this_server_id)
             if server_j not in eliminate:
                 self.increase_vector_clock()
-                payload["vector_clock"] = str(self.get_vector_clock())
-                try:                
+                payload["vector_clock"] = str(self.get_vector_clock())       
+                try:                                                                 #newchange
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         s.connect((self.servers[server_j].server_address, int(
                             self.servers[server_j].coordination_port)))
@@ -576,7 +574,7 @@ class ChatSystem:
         with threading.Lock():
             return self.vector_clock
 
-    def get_leader(self):
+    def get_leader(self):                  #new change
         with threading.Lock():
             return self.leader
 
