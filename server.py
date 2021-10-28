@@ -107,7 +107,7 @@ class Server:
         start_new_thread(self.client_server_tcp_handler, ())
         server_thread_count = 0
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((self.server_address, self.coordination_port))
+        s.bind(("", self.coordination_port))
         s.listen()
         while True:
             connection, addr = s.accept()
@@ -119,7 +119,7 @@ class Server:
     def client_server_tcp_handler(self):
         client_thread_count = 0
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((self.server_address, self.clients_port))
+        s.bind(("", self.clients_port))
         s.listen()
         while True:
             connection, addr = s.accept()
@@ -242,31 +242,30 @@ class Server:
                                                    "identities": thread_owner.room.get_client_id_list(),
                                                    "owner": thread_owner.room.owner.id})
                 elif data['type'] == 'createroom':
-                    while(True):
-                        try:
-                            if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
-                                    not data['roomid'].isalnum()) or (
-                                    not 3 <= len(data['roomid']) <= 16):
-                                self.sendall_json(connection,
-                                                {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
-                                break
-                            else:
+                    if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
+                            not data['roomid'].isalnum()) or (
+                                not 3 <= len(data['roomid']) <= 16):
+                            self.sendall_json(connection,
+                                {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
+                    else:
+                        wait = True
+                        while(wait):
+                            try:
                                 # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
                                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                                    s.connect((self.chat_system.servers[self.chat_system.leader].server_address,
-                                            int(self.chat_system.servers[self.chat_system.leader].coordination_port)))
+                                    s.connect((self.chat_system.servers[self.chat_system.get_leader()].server_address,
+                                            int(self.chat_system.servers[self.chat_system.get_leader()].coordination_port)))
                                     s.sendall(json.dumps(
                                         {"type": "createroom", "roomid": data['roomid'], "clientid": thread_owner.id,
                                         "serverid": thread_owner.server.server_id},
                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
                                     leader_response = json.loads(
                                         s.recv(1024).decode("utf-8"))
-
+                                    wait = False
                                 if leader_response['approved'] == 'false':
                                     self.sendall_json(connection,
                                                     {"type": "createroom", "roomid": leader_response['roomid'],
                                                     "approved": "false"})
-                                    break
                                 elif leader_response['approved'] == 'true':
                                     self.chat_system.add_chat_room(ChatRoom(leader_response['roomid'],
                                                                             thread_owner, self))
@@ -276,12 +275,10 @@ class Server:
                                                     "approved": "true"})
                                     thread_owner.join_room(
                                         self.chat_system.get_chat_room(leader_response['roomid']))
-                                    break
                                 else:
                                     print("Error occurred in createroom operation")
-                                    break
-                        except socket.error as e:
-                            self.bully.run_election()
+                            except socket.error as e:
+                                self.bully.run_election()
 
                 elif data['type'] == 'joinroom':
                         requested_chat_room = self.chat_system.get_chat_room(
@@ -566,15 +563,22 @@ class ChatSystem:
             if server_j not in eliminate:
                 self.increase_vector_clock()
                 payload["vector_clock"] = str(self.get_vector_clock())
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.connect((self.servers[server_j].server_address, int(
-                        self.servers[server_j].coordination_port)))
-                    s.sendall(json.dumps(payload,
-                                         ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                try:                
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.connect((self.servers[server_j].server_address, int(
+                            self.servers[server_j].coordination_port)))
+                        s.sendall(json.dumps(payload,
+                                            ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+                except socket.error as e:
+                    print("cannot connect to " + str(self.servers[server_j].server_address))
 
     def get_vector_clock(self):
         with threading.Lock():
             return self.vector_clock
+
+    def get_leader(self):
+        with threading.Lock():
+            return self.leader
 
     def increase_vector_clock(self, array={}):
         with threading.Lock():
@@ -671,7 +675,7 @@ class Bully:
                 print("Server " + str(self.serverid) +
                       " sends a election message to server " + str(i) + "\n")
         sleep(0.25)
-        if(self.state != "takenover"):
+        if(self.state != "takenover" and self.state != "coordinated"):
             self.send_elected_msg()
             self.setState("coordinator")
             print("Server " + str(self.serverid) +
