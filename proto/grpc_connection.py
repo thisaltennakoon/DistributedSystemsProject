@@ -15,3 +15,8 @@ class GrpcConnections:
                   'created successfully')
 
         return stubs
+
+    def create_stub(adress, port):
+        channel =grpc.insecure_channel(str(adress) + ':' + str(port))
+        stub = route_pb2_grpc.serviceStub(channel)
+        return stub
