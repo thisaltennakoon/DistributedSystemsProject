@@ -5,7 +5,7 @@ import json
 from _thread import *
 import argparse
 import threading
-import time
+from time import sleep
 from concurrent import futures
 
 import grpc
@@ -398,20 +398,24 @@ class Server:
                         break
                     else:
                         # Server sends {"type" : "newidentity", "identity" : "Adel", “serverid” : “s1”} to the leader
-                        leader_response = self.chat_system.stubs[self.chat_system.leader].identityApproval(
-                            route_pb2.IdApprovalRequest(client_id=data['identity'], server_id=self.server_id))
-
-                        if leader_response.approval == 'false':
-                            self.sendall_json(connection, {"type": "newidentity", "approved": "false"})
-                            break
-                        elif leader_response.approval == 'true':
-                            self.sendall_json(connection, {"type": "newidentity", "approved": "true"})
-                            self.chat_system.add_user(Client(data['identity'], connection, self))
-                            thread_owner = self.chat_system.get_user(data['identity'])
-                            print('thread_owner', thread_owner)
-                        else:
-                            print("Error occurred in newidentity operation")
-                            break
+                        wait = True
+                        while(wait):
+                            try:
+                                leader_response = self.chat_system.stubs[self.chat_system.leader].identityApproval(
+                                    route_pb2.IdApprovalRequest(client_id=data['identity'], server_id=self.server_id))
+                                wait = False
+                                if leader_response.approval == 'false':
+                                    self.sendall_json(connection, {"type": "newidentity", "approved": "false"})
+                                    break
+                                elif leader_response.approval == 'true':
+                                    self.sendall_json(connection, {"type": "newidentity", "approved": "true"})
+                                    self.chat_system.add_user(Client(data['identity'], connection, self))
+                                    thread_owner = self.chat_system.get_user(data['identity'])
+                                else:
+                                    print("Error occurred in newidentity operation")
+                                    break
+                            except grpc.RpcError as e:
+                                self.bully.run_election()
 
                 elif data['type'] == 'list':
                     print('#list')
@@ -424,33 +428,41 @@ class Server:
                                                    "identities": thread_owner.room.get_client_id_list(),
                                                    "owner": thread_owner.room.owner.id})
                 elif data['type'] == 'createroom':
-                    if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
-                            not data['roomid'].isalnum()) or (
-                            not 3 <= len(data['roomid']) <= 16):
-                        self.sendall_json(connection,
-                                          {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
-                    else:
-                        # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
-                        leader_response = self.chat_system.stubs[self.chat_system.leader].roomApproval(
-                            route_pb2.RoomApprovalRequest(room_id=data['roomid'], client_id=thread_owner.id,
-                                                          server_id=thread_owner.server.server_id))
+                    while(True):
+                        try:
+                            if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
+                                    not data['roomid'].isalnum()) or (
+                                    not 3 <= len(data['roomid']) <= 16):
+                                self.sendall_json(connection,
+                                              {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
+                                break
+                            else:
+                                # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
+                                leader_response = self.chat_system.stubs[self.chat_system.leader].roomApproval(
+                                    route_pb2.RoomApprovalRequest(room_id=data['roomid'], client_id=thread_owner.id,
+                                                                server_id=thread_owner.server.server_id))
 
-                        if leader_response.approval == 'false':
-                            self.sendall_json(connection,
-                                              {"type": "createroom", "roomid": leader_response.room_id,
-                                               "approved": "false"})
+                                if leader_response.approval == 'false':
+                                    self.sendall_json(connection,
+                                                    {"type": "createroom", "roomid": leader_response.room_id,
+                                                    "approved": "false"})
+                                    break
 
-                        elif leader_response.approval == 'true':
-                            self.chat_system.add_chat_room(ChatRoom(leader_response.room_id,
-                                                                    thread_owner, self))
+                                elif leader_response.approval == 'true':
+                                    self.chat_system.add_chat_room(ChatRoom(leader_response.room_id,
+                                                                            thread_owner, self))
 
-                            self.sendall_json(connection,
-                                              {"type": "createroom", "roomid": leader_response.room_id,
-                                               "approved": "true"})
-                            thread_owner.join_room(self.chat_system.get_chat_room(leader_response.room_id))
+                                    self.sendall_json(connection,
+                                                    {"type": "createroom", "roomid": leader_response.room_id,
+                                                    "approved": "true"})
+                                    thread_owner.join_room(self.chat_system.get_chat_room(leader_response.room_id))
+                                    break
 
-                        else:
-                            print("Error occurred in createroom operation")
+                                else:
+                                    print("Error occurred in createroom operation")
+                                    break
+                        except grpc.RpcError as e:
+                            self.bully.run_election()
                 elif data['type'] == 'joinroom':
                     requested_chat_room = self.chat_system.get_chat_room(data['roomid'])  # gives False or chatroom
                     if not requested_chat_room or self.user_owns_chat_room(thread_owner):
@@ -641,7 +653,7 @@ class Server:
                     requested_user.server = None
                 self.chat_system.increase_vector_clock()
 
-    # GRPC ############################################################################################
+    # GRPC Starts ############################################################################################
     def grpc_server(self):
         serverGrpc = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         route_pb2_grpc.add_serviceServicer_to_server(
@@ -724,10 +736,10 @@ class Service(route_pb2_grpc.serviceServicer):
     def createRoomByLeader(self, request, context):
         if request.approval == 'true':
             self.current_server.chat_system.add_chat_room(ChatRoom(request.room_id,
-                                                                                   self.current_server.chat_system.servers[
-                                                                                       request.server_id].owner,
-                                                                                   self.current_server.chat_system.servers[
-                                                                                       request.server_id]))
+                                                                   self.current_server.chat_system.servers[
+                                                                       request.server_id].owner,
+                                                                   self.current_server.chat_system.servers[
+                                                                       request.server_id]))
 
             return route_pb2.Response(response='OK')
 
@@ -759,7 +771,8 @@ class Service(route_pb2_grpc.serviceServicer):
                                                           self.current_server.chat_system.get_vector_clock())))
                 except grpc.RpcError as e:
                     pass
-        print("changeserver request from " + request.current_server_id + " to " + request.destination_server_id + " by " + request.client_id)
+        print(
+            "changeserver request from " + request.current_server_id + " to " + request.destination_server_id + " by " + request.client_id)
         return return_res
 
     def changeServerByLeader(self, request, context):
@@ -771,8 +784,26 @@ class Service(route_pb2_grpc.serviceServicer):
         self.current_server.chat_system.increase_vector_clock()
         return route_pb2.Response(response='OK')
 
+    def new_leader(self, request, context):
+        self.current_server.chat_system.leader = request.leader_id
+        self.current_server.bully.new_leader_msg(request.sender_id)
+        print("Server:", request.sender_id, "said Server:", request.leader_id, "is the new leader")
+        return route_pb2.Response(response='OK')
 
-# GRPC ######################################################################################
+    def start_election(self, request, context):
+        self.current_server.bully.election_msg_received(request.server_id)
+        return route_pb2.Response(response='OK')
+
+    def took_over(self, request, context):
+        self.current_server.bully.took_over_msg(request.server_id)
+        return route_pb2.Response(response='OK')
+
+    def delete_server(self, request, context):
+        self.current_server.chat_system.servers.pop(request.server_id)
+        print("server", request.server_id, "deleted from serverlist. new list =", str(self.current_server.chat_system.servers))
+        return route_pb2.Response(response='OK')
+
+# GRPC Ends ######################################################################################
 
 class ChatSystem:
     def __init__(self):
@@ -913,6 +944,94 @@ class ChatSystem:
                 return True
             else:
                 return False
+
+
+# Bully Algorithm
+class Bully:
+    def __init__(self, serverid, chatSystem):
+        self.serverid = serverid
+        self.nodeid = int(self.serverid[1:])
+        # coordinator, coodinated, offline, election, takenover, intermediate
+        self.state = "coodinated"
+        self.serverList = chatSystem.servers
+        self.stubs = ChatSystem.stubs
+
+    def setState(self, _state):
+        self.state = _state
+
+    def getState(self):
+        return self.state
+
+    def run_election(self):
+        self.setState("election")
+        print("started election by the server " + str(self.serverid) + "\n")
+        for i in (self.serverList):
+            j = i[1:]
+            if int(j) > self.nodeid:
+                self.send_election_msg(i)
+                print("Server " + str(self.serverid) +
+                      " sends a election message to server " + str(i) + "\n")
+        sleep(0.25)
+        if (self.state != "takenover"):
+            self.send_elected_msg()
+            self.setState("coordinator")
+            print("Server " + str(self.serverid) +
+                  " is elected as the new leader")
+        else:
+            self.setState("intermediate")
+        return
+
+    def send_json_message(self, host, port, msg):
+        print(self.serverid + " sends " + str(msg) + " to " + str(port))
+        message = json.dumps(msg, ensure_ascii=False).encode(
+            'utf8') + '\n'.encode('utf8')
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((host, port))
+            s.sendall(message)
+            s.close
+        except socket.error:
+            print("connot connect to " + host + " " + str(port))
+
+    def send_election_msg(self, id):
+        try:
+            response = self.stubs[id].start_election(route_pb2.BullyMessage(server_id=self.serverid))
+        except grpc.RpcError as e:
+            print('Cannot connect to:', self.serverList[id].server_address, self.serverList[id].coordination_port)
+            pass
+        # self.send_json_message(self.serverList[id].server_address, self.serverList[id].coordination_port, {
+        #     "type": "start_election", "serverid": self.serverid})
+
+    def send_elected_msg(self):
+        for i in self.serverList:
+            try:
+                response = self.stubs[i].new_leader(route_pb2.NewLeaderMessage(sender_id=self.serverid, leader_id=self.serverid))
+            except grpc.RpcError as e:
+                print('Cannot connect to:', self.serverList[i].server_address, self.serverList[i].coordination_port)
+                pass
+            # self.send_json_message(self.serverList[i].server_address, self.serverList[i].coordination_port, {
+            #     "type": "newleader", "leaderid": self.serverid, "senderid": self.serverid})
+
+    def new_leader_msg(self, id):
+        print("")
+        self.setState("coordinated")
+        # return(json.dumps({"type": "accepted"}, ensure_ascii=False).encode('utf8') + '\n'.encode('utf8'))
+
+    def took_over_msg(self, id):
+        self.setState("takenover")
+
+    def election_msg_received(self, id):
+        self.setState("takenover")
+        print(self.serverid + " received election msg from " + id)
+        try:
+            response = self.stubs[id].took_over(route_pb2.BullyMessage(server_id=self.serverid))
+        except grpc.RpcError as e:
+            print('Cannot connect to:', self.serverList[id].server_address, self.serverList[id].coordination_port)
+            pass
+        # self.send_json_message(self.serverList[id].server_address, self.serverList[id].coordination_port, {
+        #     "type": "tookover", "serverid": self.serverid})
+        if (self.getState != "election" and self.getState != "takenover"):
+            self.run_election()
 
 
 chat_system = ChatSystem()

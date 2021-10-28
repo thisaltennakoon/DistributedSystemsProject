@@ -11,6 +11,10 @@ service service{
   rpc leaderElection (LeaderElectionRequest) returns (Response);
   rpc createRoomByLeader (NewRoomRequest) returns (Response);
   rpc changeServerByLeader (ChangeServerRequest) returns (Response);
+  rpc start_election (BullyMessage) returns (Response);
+  rpc took_over (BullyMessage) returns (Response);
+  rpc delete_server (BullyMessage) returns (Response);
+  rpc new_leader (NewLeaderMessage) returns (Response);
 }
 
 
@@ -72,4 +76,11 @@ message ChangeServerRequest{
   string client_id = 3;
   string approval = 4;
   string vector_clock = 5;
+}
+message BullyMessage{
+  string server_id = 1;
+}
+message NewLeaderMessage{
+  string sender_id = 1;
+  string leader_id = 2;
 }

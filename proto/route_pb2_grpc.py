@@ -64,6 +64,26 @@ class serviceStub(object):
                 request_serializer=proto_dot_route__pb2.ChangeServerRequest.SerializeToString,
                 response_deserializer=proto_dot_route__pb2.Response.FromString,
                 )
+        self.start_election = channel.unary_unary(
+                '/service/start_election',
+                request_serializer=proto_dot_route__pb2.BullyMessage.SerializeToString,
+                response_deserializer=proto_dot_route__pb2.Response.FromString,
+                )
+        self.took_over = channel.unary_unary(
+                '/service/took_over',
+                request_serializer=proto_dot_route__pb2.BullyMessage.SerializeToString,
+                response_deserializer=proto_dot_route__pb2.Response.FromString,
+                )
+        self.delete_server = channel.unary_unary(
+                '/service/delete_server',
+                request_serializer=proto_dot_route__pb2.BullyMessage.SerializeToString,
+                response_deserializer=proto_dot_route__pb2.Response.FromString,
+                )
+        self.new_leader = channel.unary_unary(
+                '/service/new_leader',
+                request_serializer=proto_dot_route__pb2.NewLeaderMessage.SerializeToString,
+                response_deserializer=proto_dot_route__pb2.Response.FromString,
+                )
 
 
 class serviceServicer(object):
@@ -129,6 +149,30 @@ class serviceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def start_election(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def took_over(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def delete_server(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def new_leader(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_serviceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -180,6 +224,26 @@ def add_serviceServicer_to_server(servicer, server):
             'changeServerByLeader': grpc.unary_unary_rpc_method_handler(
                     servicer.changeServerByLeader,
                     request_deserializer=proto_dot_route__pb2.ChangeServerRequest.FromString,
+                    response_serializer=proto_dot_route__pb2.Response.SerializeToString,
+            ),
+            'start_election': grpc.unary_unary_rpc_method_handler(
+                    servicer.start_election,
+                    request_deserializer=proto_dot_route__pb2.BullyMessage.FromString,
+                    response_serializer=proto_dot_route__pb2.Response.SerializeToString,
+            ),
+            'took_over': grpc.unary_unary_rpc_method_handler(
+                    servicer.took_over,
+                    request_deserializer=proto_dot_route__pb2.BullyMessage.FromString,
+                    response_serializer=proto_dot_route__pb2.Response.SerializeToString,
+            ),
+            'delete_server': grpc.unary_unary_rpc_method_handler(
+                    servicer.delete_server,
+                    request_deserializer=proto_dot_route__pb2.BullyMessage.FromString,
+                    response_serializer=proto_dot_route__pb2.Response.SerializeToString,
+            ),
+            'new_leader': grpc.unary_unary_rpc_method_handler(
+                    servicer.new_leader,
+                    request_deserializer=proto_dot_route__pb2.NewLeaderMessage.FromString,
                     response_serializer=proto_dot_route__pb2.Response.SerializeToString,
             ),
     }
@@ -358,6 +422,74 @@ class service(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/service/changeServerByLeader',
             proto_dot_route__pb2.ChangeServerRequest.SerializeToString,
+            proto_dot_route__pb2.Response.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def start_election(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/service/start_election',
+            proto_dot_route__pb2.BullyMessage.SerializeToString,
+            proto_dot_route__pb2.Response.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def took_over(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/service/took_over',
+            proto_dot_route__pb2.BullyMessage.SerializeToString,
+            proto_dot_route__pb2.Response.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def delete_server(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/service/delete_server',
+            proto_dot_route__pb2.BullyMessage.SerializeToString,
+            proto_dot_route__pb2.Response.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def new_leader(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/service/new_leader',
+            proto_dot_route__pb2.NewLeaderMessage.SerializeToString,
             proto_dot_route__pb2.Response.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
