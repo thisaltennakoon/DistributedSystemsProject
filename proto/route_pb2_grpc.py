@@ -84,6 +84,11 @@ class serviceStub(object):
                 request_serializer=proto_dot_route__pb2.NewLeaderMessage.SerializeToString,
                 response_deserializer=proto_dot_route__pb2.Response.FromString,
                 )
+        self.is_live = channel.unary_unary(
+                '/service/is_live',
+                request_serializer=proto_dot_route__pb2.HeartBeatCheker.SerializeToString,
+                response_deserializer=proto_dot_route__pb2.HeartBeatStatus.FromString,
+                )
 
 
 class serviceServicer(object):
@@ -173,6 +178,12 @@ class serviceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def is_live(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_serviceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -245,6 +256,11 @@ def add_serviceServicer_to_server(servicer, server):
                     servicer.new_leader,
                     request_deserializer=proto_dot_route__pb2.NewLeaderMessage.FromString,
                     response_serializer=proto_dot_route__pb2.Response.SerializeToString,
+            ),
+            'is_live': grpc.unary_unary_rpc_method_handler(
+                    servicer.is_live,
+                    request_deserializer=proto_dot_route__pb2.HeartBeatCheker.FromString,
+                    response_serializer=proto_dot_route__pb2.HeartBeatStatus.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -491,5 +507,22 @@ class service(object):
         return grpc.experimental.unary_unary(request, target, '/service/new_leader',
             proto_dot_route__pb2.NewLeaderMessage.SerializeToString,
             proto_dot_route__pb2.Response.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def is_live(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/service/is_live',
+            proto_dot_route__pb2.HeartBeatCheker.SerializeToString,
+            proto_dot_route__pb2.HeartBeatStatus.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

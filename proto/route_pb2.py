@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x11proto/route.proto\"!\n\x0c\x44\x65lIdRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\"!\n\x0e\x44\x65lRoomRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\"\x1c\n\x08Response\x12\x10\n\x08response\x18\x01 \x01(\t\"9\n\x11IdApprovalRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x11\n\tserver_id\x18\x02 \x01(\t\"L\n\x13RoomApprovalRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\"\x80\x01\n\x1b\x43hangeServerApprovalRequest\x12\x19\n\x11\x63urrent_server_id\x18\x01 \x01(\t\x12\x1d\n\x15\x64\x65stination_server_id\x18\x02 \x01(\t\x12\x11\n\tclient_id\x18\x03 \x01(\t\x12\x14\n\x0cvector_clock\x18\x04 \x01(\t\"\x1c\n\x08\x41pproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\"1\n\x0cRoomApproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\x12\x0f\n\x07room_id\x18\x02 \x01(\t\">\n\x14\x43hangeServerApproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\x12\x14\n\x0cvector_clock\x18\x02 \x01(\t\"\x1f\n\x0cHelloRequest\x12\x0f\n\x07request\x18\x01 \x01(\t\"L\n\x12NewIdentityRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x10\n\x08\x61pproval\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\"*\n\x15LeaderElectionRequest\x12\x11\n\tleader_id\x18\x01 \x01(\t\"Y\n\x0eNewRoomRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\x12\x10\n\x08\x61pproval\x18\x04 \x01(\t\"\x8a\x01\n\x13\x43hangeServerRequest\x12\x19\n\x11\x63urrent_server_id\x18\x01 \x01(\t\x12\x1d\n\x15\x64\x65stination_server_id\x18\x02 \x01(\t\x12\x11\n\tclient_id\x18\x03 \x01(\t\x12\x10\n\x08\x61pproval\x18\x04 \x01(\t\x12\x14\n\x0cvector_clock\x18\x05 \x01(\t\"!\n\x0c\x42ullyMessage\x12\x11\n\tserver_id\x18\x01 \x01(\t\"8\n\x10NewLeaderMessage\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x11\n\tleader_id\x18\x02 \x01(\t2\xc7\x05\n\x07service\x12,\n\x0e\x64\x65leteIdentity\x12\r.DelIdRequest\x1a\t.Response\"\x00\x12*\n\ndeleteRoom\x12\x0f.DelRoomRequest\x1a\t.Response\"\x00\x12\x33\n\x10identityApproval\x12\x12.IdApprovalRequest\x1a\t.Approval\"\x00\x12\x35\n\x0croomApproval\x12\x14.RoomApprovalRequest\x1a\r.RoomApproval\"\x00\x12M\n\x14\x63hangeServerApproval\x12\x1c.ChangeServerApprovalRequest\x1a\x15.ChangeServerApproval\"\x00\x12&\n\x08sayHello\x12\r.HelloRequest\x1a\t.Response\"\x00\x12\x35\n\x13newIdentityByLeader\x12\x13.NewIdentityRequest\x1a\t.Response\x12\x33\n\x0eleaderElection\x12\x16.LeaderElectionRequest\x1a\t.Response\x12\x30\n\x12\x63reateRoomByLeader\x12\x0f.NewRoomRequest\x1a\t.Response\x12\x37\n\x14\x63hangeServerByLeader\x12\x14.ChangeServerRequest\x1a\t.Response\x12*\n\x0estart_election\x12\r.BullyMessage\x1a\t.Response\x12%\n\ttook_over\x12\r.BullyMessage\x1a\t.Response\x12)\n\rdelete_server\x12\r.BullyMessage\x1a\t.Response\x12*\n\nnew_leader\x12\x11.NewLeaderMessage\x1a\t.Responseb\x06proto3'
+  serialized_pb=b'\n\x11proto/route.proto\"!\n\x0c\x44\x65lIdRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\"!\n\x0e\x44\x65lRoomRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\"\x1c\n\x08Response\x12\x10\n\x08response\x18\x01 \x01(\t\"9\n\x11IdApprovalRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x11\n\tserver_id\x18\x02 \x01(\t\"L\n\x13RoomApprovalRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\"\x80\x01\n\x1b\x43hangeServerApprovalRequest\x12\x19\n\x11\x63urrent_server_id\x18\x01 \x01(\t\x12\x1d\n\x15\x64\x65stination_server_id\x18\x02 \x01(\t\x12\x11\n\tclient_id\x18\x03 \x01(\t\x12\x14\n\x0cvector_clock\x18\x04 \x01(\t\"\x1c\n\x08\x41pproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\"1\n\x0cRoomApproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\x12\x0f\n\x07room_id\x18\x02 \x01(\t\">\n\x14\x43hangeServerApproval\x12\x10\n\x08\x61pproval\x18\x01 \x01(\t\x12\x14\n\x0cvector_clock\x18\x02 \x01(\t\"\x1f\n\x0cHelloRequest\x12\x0f\n\x07request\x18\x01 \x01(\t\"L\n\x12NewIdentityRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x10\n\x08\x61pproval\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\"*\n\x15LeaderElectionRequest\x12\x11\n\tleader_id\x18\x01 \x01(\t\"Y\n\x0eNewRoomRequest\x12\x0f\n\x07room_id\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\x12\x11\n\tserver_id\x18\x03 \x01(\t\x12\x10\n\x08\x61pproval\x18\x04 \x01(\t\"\x8a\x01\n\x13\x43hangeServerRequest\x12\x19\n\x11\x63urrent_server_id\x18\x01 \x01(\t\x12\x1d\n\x15\x64\x65stination_server_id\x18\x02 \x01(\t\x12\x11\n\tclient_id\x18\x03 \x01(\t\x12\x10\n\x08\x61pproval\x18\x04 \x01(\t\x12\x14\n\x0cvector_clock\x18\x05 \x01(\t\"!\n\x0c\x42ullyMessage\x12\x11\n\tserver_id\x18\x01 \x01(\t\"8\n\x10NewLeaderMessage\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x11\n\tleader_id\x18\x02 \x01(\t\"!\n\x0fHeartBeatCheker\x12\x0e\n\x06isLive\x18\x01 \x01(\t\"!\n\x0fHeartBeatStatus\x12\x0e\n\x06isLive\x18\x01 \x01(\t2\xf6\x05\n\x07service\x12,\n\x0e\x64\x65leteIdentity\x12\r.DelIdRequest\x1a\t.Response\"\x00\x12*\n\ndeleteRoom\x12\x0f.DelRoomRequest\x1a\t.Response\"\x00\x12\x33\n\x10identityApproval\x12\x12.IdApprovalRequest\x1a\t.Approval\"\x00\x12\x35\n\x0croomApproval\x12\x14.RoomApprovalRequest\x1a\r.RoomApproval\"\x00\x12M\n\x14\x63hangeServerApproval\x12\x1c.ChangeServerApprovalRequest\x1a\x15.ChangeServerApproval\"\x00\x12&\n\x08sayHello\x12\r.HelloRequest\x1a\t.Response\"\x00\x12\x35\n\x13newIdentityByLeader\x12\x13.NewIdentityRequest\x1a\t.Response\x12\x33\n\x0eleaderElection\x12\x16.LeaderElectionRequest\x1a\t.Response\x12\x30\n\x12\x63reateRoomByLeader\x12\x0f.NewRoomRequest\x1a\t.Response\x12\x37\n\x14\x63hangeServerByLeader\x12\x14.ChangeServerRequest\x1a\t.Response\x12*\n\x0estart_election\x12\r.BullyMessage\x1a\t.Response\x12%\n\ttook_over\x12\r.BullyMessage\x1a\t.Response\x12)\n\rdelete_server\x12\r.BullyMessage\x1a\t.Response\x12*\n\nnew_leader\x12\x11.NewLeaderMessage\x1a\t.Response\x12-\n\x07is_live\x12\x10.HeartBeatCheker\x1a\x10.HeartBeatStatusb\x06proto3'
 )
 
 
@@ -662,6 +662,70 @@ _NEWLEADERMESSAGE = _descriptor.Descriptor(
   serialized_end=1012,
 )
 
+
+_HEARTBEATCHEKER = _descriptor.Descriptor(
+  name='HeartBeatCheker',
+  full_name='HeartBeatCheker',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='isLive', full_name='HeartBeatCheker.isLive', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1014,
+  serialized_end=1047,
+)
+
+
+_HEARTBEATSTATUS = _descriptor.Descriptor(
+  name='HeartBeatStatus',
+  full_name='HeartBeatStatus',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='isLive', full_name='HeartBeatStatus.isLive', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1049,
+  serialized_end=1082,
+)
+
 DESCRIPTOR.message_types_by_name['DelIdRequest'] = _DELIDREQUEST
 DESCRIPTOR.message_types_by_name['DelRoomRequest'] = _DELROOMREQUEST
 DESCRIPTOR.message_types_by_name['Response'] = _RESPONSE
@@ -678,6 +742,8 @@ DESCRIPTOR.message_types_by_name['NewRoomRequest'] = _NEWROOMREQUEST
 DESCRIPTOR.message_types_by_name['ChangeServerRequest'] = _CHANGESERVERREQUEST
 DESCRIPTOR.message_types_by_name['BullyMessage'] = _BULLYMESSAGE
 DESCRIPTOR.message_types_by_name['NewLeaderMessage'] = _NEWLEADERMESSAGE
+DESCRIPTOR.message_types_by_name['HeartBeatCheker'] = _HEARTBEATCHEKER
+DESCRIPTOR.message_types_by_name['HeartBeatStatus'] = _HEARTBEATSTATUS
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 DelIdRequest = _reflection.GeneratedProtocolMessageType('DelIdRequest', (_message.Message,), {
@@ -792,6 +858,20 @@ NewLeaderMessage = _reflection.GeneratedProtocolMessageType('NewLeaderMessage', 
   })
 _sym_db.RegisterMessage(NewLeaderMessage)
 
+HeartBeatCheker = _reflection.GeneratedProtocolMessageType('HeartBeatCheker', (_message.Message,), {
+  'DESCRIPTOR' : _HEARTBEATCHEKER,
+  '__module__' : 'proto.route_pb2'
+  # @@protoc_insertion_point(class_scope:HeartBeatCheker)
+  })
+_sym_db.RegisterMessage(HeartBeatCheker)
+
+HeartBeatStatus = _reflection.GeneratedProtocolMessageType('HeartBeatStatus', (_message.Message,), {
+  'DESCRIPTOR' : _HEARTBEATSTATUS,
+  '__module__' : 'proto.route_pb2'
+  # @@protoc_insertion_point(class_scope:HeartBeatStatus)
+  })
+_sym_db.RegisterMessage(HeartBeatStatus)
+
 
 
 _SERVICE = _descriptor.ServiceDescriptor(
@@ -801,8 +881,8 @@ _SERVICE = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1015,
-  serialized_end=1726,
+  serialized_start=1085,
+  serialized_end=1843,
   methods=[
   _descriptor.MethodDescriptor(
     name='deleteIdentity',
@@ -941,6 +1021,16 @@ _SERVICE = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_NEWLEADERMESSAGE,
     output_type=_RESPONSE,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='is_live',
+    full_name='service.is_live',
+    index=14,
+    containing_service=None,
+    input_type=_HEARTBEATCHEKER,
+    output_type=_HEARTBEATSTATUS,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

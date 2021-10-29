@@ -15,6 +15,7 @@ service service{
   rpc took_over (BullyMessage) returns (Response);
   rpc delete_server (BullyMessage) returns (Response);
   rpc new_leader (NewLeaderMessage) returns (Response);
+  rpc is_live (HeartBeatCheker) returns (HeartBeatStatus);
 }
 
 
@@ -83,4 +84,10 @@ message BullyMessage{
 message NewLeaderMessage{
   string sender_id = 1;
   string leader_id = 2;
+}
+message HeartBeatCheker{
+  string isLive = 1;
+}
+message HeartBeatStatus{
+  string isLive = 1;
 }

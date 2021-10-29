@@ -102,9 +102,44 @@ class Server:
         self.chat_system.add_chat_room(ChatRoom("MainHall-" + self.server_id, owner, self))
         self.stub = GrpcConnections.create_stub(self.server_address, self.coordination_port)
         self.bully = Bully(server_id, chat_system)
+        self.server_live = 'True'
+
+    def set_server_live(self, value):
+        with threading.Lock():
+            self.server_live = value
+
+    def get_server_live(self):
+        with threading.Lock():
+            return self.server_live
+
+    def threaded_heartbeat(self):
+        while True:
+
+            if (self.chat_system.is_leader()):
+                changes_count = 0
+                sleep(4)
+                eliminate = []
+                eliminate.append(self.server_id)
+                for server_j in self.chat_system.servers:
+                    if server_j not in eliminate:
+                        try:
+                            response = self.chat_system.stubs[server_j].is_live(route_pb2.HeartBeatCheker(isLive="isLive"))  # todo
+
+                            if self.chat_system.servers[server_j].get_server_live() == 'False':
+                                changes_count+= 1
+                                self.chat_system.servers[server_j].set_server_live(response.isLive)
+                        except grpc.RpcError as e:
+
+                            if self.chat_system.servers[server_j].get_server_live() == 'True':
+                                changes_count+= 1
+                                self.chat_system.servers[server_j].set_server_live('False')
+                            pass
+                if changes_count > 0:
+                    print("Termination/Addition of servers identified!")
 
     def run_grpc_server(self):
         start_new_thread(self.client_server_tcp_handler, ())
+        start_new_thread(self.threaded_heartbeat, ())
         while True:
             self.grpc_server()
 
@@ -133,6 +168,7 @@ class Server:
                     response = self.chat_system.stubs[server_j].deleteIdentity(
                         route_pb2.DelIdRequest(client_id=client.id))
                 except grpc.RpcError as e:
+                    print('Cannot connect to the server:', str(server_j))
                     pass
 
         self.sendall_json(client.connection,
@@ -154,6 +190,7 @@ class Server:
                     response = self.chat_system.stubs[server_j].deleteRoom(
                         route_pb2.DelRoomRequest(room_id=chat_room.name))
                 except grpc.RpcError as e:
+                    print('Cannot connect to the server:', str(server_j))
                     pass
         self.sendall_json(chat_room.owner.connection,
                           {"type": "deleteroom", "roomid": chat_room.name, "approved": "true"})
@@ -187,6 +224,7 @@ class Server:
                     data = json.loads(data.decode("utf-8"))
                     print(data)
                 else:
+                    self.remove_client_from_the_server(thread_owner)
                     break
 
                 if data['type'] == 'newidentity':
@@ -198,9 +236,9 @@ class Server:
                     else:
                         # Server sends {"type" : "newidentity", "identity" : "Adel", “serverid” : “s1”} to the leader
                         wait = True
-                        while(wait):
+                        while (wait):
                             try:
-                                leader_response = self.chat_system.stubs[self.chat_system.leader].identityApproval(
+                                leader_response = self.chat_system.stubs[self.chat_system.get_leader()].identityApproval(
                                     route_pb2.IdApprovalRequest(client_id=data['identity'], server_id=self.server_id))
                                 wait = False
                                 if leader_response.approval == 'false':
@@ -214,6 +252,7 @@ class Server:
                                     print("Error occurred in newidentity operation")
                                     break
                             except grpc.RpcError as e:
+                                print('Cannot connect to the server:', str(self.chat_system.get_leader()))
                                 self.bully.run_election()
 
                 elif data['type'] == 'list':
@@ -228,38 +267,39 @@ class Server:
                                                    "owner": thread_owner.room.owner.id})
                 elif data['type'] == 'createroom':
                     if (self.chat_system.get_chat_room(data['roomid'])) or (self.user_owns_chat_room(thread_owner)) or (
-                                    not data['roomid'].isalnum()) or (
-                                    not 3 <= len(data['roomid']) <= 16):
-                                self.sendall_json(connection,
-                                              {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
+                            not data['roomid'].isalnum()) or (
+                            not 3 <= len(data['roomid']) <= 16):
+                        self.sendall_json(connection,
+                                          {"type": "createroom", "roomid": data['roomid'], "approved": "false"})
 
                     else:
                         wait = True
-                        while(wait):
+                        while (wait):
                             try:
                                 # Server sends {"type" : "createroom", "roomid" : data['roomid'], “clientid” : “Adel”} to the leader
                                 leader_response = self.chat_system.stubs[self.chat_system.get_leader()].roomApproval(
                                     route_pb2.RoomApprovalRequest(room_id=data['roomid'], client_id=thread_owner.id,
-                                                                server_id=thread_owner.server.server_id))
+                                                                  server_id=thread_owner.server.server_id))
 
                                 if leader_response.approval == 'false':
                                     self.sendall_json(connection,
-                                                 {"type": "createroom", "roomid": leader_response.room_id,
-                                                    "approved": "false"})
+                                                      {"type": "createroom", "roomid": leader_response.room_id,
+                                                       "approved": "false"})
 
                                 elif leader_response.approval == 'true':
                                     self.chat_system.add_chat_room(ChatRoom(leader_response.room_id,
                                                                             thread_owner, self))
 
                                     self.sendall_json(connection,
-                                                    {"type": "createroom", "roomid": leader_response.room_id,
-                                                    "approved": "true"})
+                                                      {"type": "createroom", "roomid": leader_response.room_id,
+                                                       "approved": "true"})
                                     thread_owner.join_room(self.chat_system.get_chat_room(leader_response.room_id))
 
                                 else:
                                     print("Error occurred in createroom operation")
                                 wait = False
                             except grpc.RpcError as e:
+                                print('Cannot connect to the server:', str(self.chat_system.get_leader()))
                                 self.bully.run_election()
                 elif data['type'] == 'joinroom':
                     requested_chat_room = self.chat_system.get_chat_room(data['roomid'])  # gives False or chatroom
@@ -273,32 +313,34 @@ class Server:
                     elif requested_chat_room and requested_chat_room.server != self:
                         current_room = self.chat_system.get_chat_room(thread_owner.room.name)
                         self.chat_system.increase_vector_clock()
-                        while(True):
+                        while (True):
                             try:
 
                                 leader_response = self.chat_system.stubs[self.chat_system.leader].changeServerApproval(
                                     route_pb2.ChangeServerApprovalRequest(current_server_id=self.server_id,
-                                                                        destination_server_id=data['roomid'],
-                                                                        client_id=thread_owner.id,
-                                                                         vector_clock=str(
-                                                                             self.chat_system.get_vector_clock())))
+                                                                          destination_server_id=data['roomid'],
+                                                                          client_id=thread_owner.id,
+                                                                          vector_clock=str(
+                                                                              self.chat_system.get_vector_clock())))
 
                                 self.chat_system.increase_vector_clock(eval(leader_response.vector_clock))
                                 if leader_response.approval == 'true':
                                     current_room.remove_client_from_the_room(thread_owner,
-                                                                     self.chat_system.get_chat_room(data['roomid']))
+                                                                             self.chat_system.get_chat_room(
+                                                                                 data['roomid']))
                                     thread_owner.about_to_change_server = True
                                     thread_owner.room = None
                                     thread_owner.server = None
                                     self.chat_system.increase_vector_clock()
                                     self.sendall_json(connection,
-                                                     {"type": "route", "roomid": data['roomid'],
-                                                     "host": self.chat_system.get_chat_room(
-                                                          data['roomid']).server.server_address,
-                                                      "port": str(self.chat_system.get_chat_room(
-                                                          data['roomid']).server.clients_port)})
+                                                      {"type": "route", "roomid": data['roomid'],
+                                                       "host": self.chat_system.get_chat_room(
+                                                           data['roomid']).server.server_address,
+                                                       "port": str(self.chat_system.get_chat_room(
+                                                           data['roomid']).server.clients_port)})
                                 break
                             except grpc.RpcError as e:
+                                print('Cannot connect to the server:', str(self.chat_system.get_leader()))
                                 self.bully.run_election()
                 elif data['type'] == 'movejoin':
 
@@ -410,6 +452,8 @@ class Service(route_pb2_grpc.serviceServicer):
                             route_pb2.NewIdentityRequest(client_id=request.client_id, approval='true',
                                                          server_id=request.server_id))
                     except grpc.RpcError as e:
+                        print('Cannot connect to the server:', str(server_i))
+
                         pass
 
             return route_pb2.Approval(approval='true')
@@ -444,6 +488,7 @@ class Service(route_pb2_grpc.serviceServicer):
                             route_pb2.NewRoomRequest(room_id=request.room_id, client_id=request.client_id,
                                                      server_id=request.server_id, approval='true'))
                     except grpc.RpcError as e:
+                        print('Cannot connect to the server:', str(server_i))
                         pass
 
             return route_pb2.RoomApproval(approval='true', room_id=request.room_id)
@@ -485,6 +530,7 @@ class Service(route_pb2_grpc.serviceServicer):
                                                       vector_clock=str(
                                                           self.current_server.chat_system.get_vector_clock())))
                 except grpc.RpcError as e:
+                    print('Cannot connect to the server:', str(server_i))
                     pass
         print(
             "changeserver request from " + request.current_server_id + " to " + request.destination_server_id + " by " + request.client_id)
@@ -515,8 +561,13 @@ class Service(route_pb2_grpc.serviceServicer):
 
     def delete_server(self, request, context):
         self.current_server.chat_system.servers.pop(request.server_id)
-        print("server", request.server_id, "deleted from serverlist. new list =", str(self.current_server.chat_system.servers))
+        print("server", request.server_id, "deleted from serverlist. new list =",
+              str(self.current_server.chat_system.servers))
         return route_pb2.Response(response='OK')
+
+    def is_live(self, request, context):
+        return route_pb2.HeartBeatStatus(isLive='True')
+
 
 # GRPC Ends ######################################################################################
 
@@ -707,7 +758,8 @@ class Bully:
     def send_elected_msg(self):
         for i in self.serverList:
             try:
-                response = self.serverList[i].stub.new_leader(route_pb2.NewLeaderMessage(sender_id=self.serverid, leader_id=self.serverid))
+                response = self.serverList[i].stub.new_leader(
+                    route_pb2.NewLeaderMessage(sender_id=self.serverid, leader_id=self.serverid))
             except grpc.RpcError as e:
                 print('Cannot connect to:', self.serverList[i].server_address, self.serverList[i].coordination_port)
                 pass
