@@ -148,7 +148,7 @@ class Server:
         while True:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind((self.server_address, self.clients_port))
+                s.bind(("", self.clients_port))
                 s.listen()
                 connection, addr = s.accept()
                 print('Connected to: ' + addr[0] + ':' + str(addr[1]))
@@ -415,7 +415,8 @@ class Server:
         serverGrpc = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         route_pb2_grpc.add_serviceServicer_to_server(
             Service(self), serverGrpc)
-        serverGrpc.add_insecure_port(str(self.server_address) + ':' + str(self.coordination_port))
+        serverGrpc.add_insecure_port("[::]" + ':' + str(self.coordination_port))
+        #serverGrpc.add_insecure_port(str(self.server_address) + ':' + str(self.coordination_port))
         serverGrpc.start()
         print('grpc server starts at: ', str(self.server_address), ':', str(self.coordination_port))
         # start_new_thread(self.client_server_tcp_handler, ())
