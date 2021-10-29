@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+service service{
+  rpc deleteIdentity (DelIdRequest) returns (Response){};
+  rpc deleteRoom (DelRoomRequest) returns (Response){};
+  rpc identityApproval (IdApprovalRequest) returns (Approval){};
+  rpc roomApproval (RoomApprovalRequest) returns (RoomApproval){};
+  rpc changeServerApproval (ChangeServerApprovalRequest) returns (ChangeServerApproval){};
+  rpc sayHello (HelloRequest) returns (Response){};
+  rpc newIdentityByLeader (NewIdentityRequest) returns (Response);
+  rpc leaderElection (LeaderElectionRequest) returns (Response);
+  rpc createRoomByLeader (NewRoomRequest) returns (Response);
+  rpc changeServerByLeader (ChangeServerRequest) returns (Response);
+  rpc start_election (BullyMessage) returns (Response);
+  rpc took_over (BullyMessage) returns (Response);
+  rpc delete_server (BullyMessage) returns (Response);
+  rpc new_leader (NewLeaderMessage) returns (Response);
+  rpc is_live (HeartBeatCheker) returns (HeartBeatStatus);
+}
+
+
+message DelIdRequest{
+  string client_id = 1;
+}
+message DelRoomRequest{
+  string room_id = 1;
+}
+message Response{
+  string response = 1;
+}
+message IdApprovalRequest{
+  string client_id = 1;
+  string server_id = 2;
+}
+message RoomApprovalRequest{
+  string room_id = 1;
+  string client_id = 2;
+  string server_id = 3;
+}
+message ChangeServerApprovalRequest{
+  string current_server_id = 1;
+  string destination_server_id = 2;
+  string client_id = 3;
+  string vector_clock = 4;
+}
+message Approval{
+  string approval = 1;
+}
+message RoomApproval{
+  string approval = 1;
+  string room_id = 2;
+}
+message ChangeServerApproval{
+  string approval = 1;
+  string vector_clock = 2;
+}
+message HelloRequest{
+  string request = 1;
+}
+message NewIdentityRequest{
+  string client_id = 1;
+  string approval = 2;
+  string  server_id = 3;
+}
+message LeaderElectionRequest{
+  string leader_id = 1;
+}
+message NewRoomRequest{
+  string room_id = 1;
+  string client_id = 2;
+  string server_id = 3;
+  string approval = 4;
+}
+message ChangeServerRequest{
+  string current_server_id = 1;
+  string destination_server_id = 2;
+  string client_id = 3;
+  string approval = 4;
+  string vector_clock = 5;
+}
+message BullyMessage{
+  string server_id = 1;
+}
+message NewLeaderMessage{
+  string sender_id = 1;
+  string leader_id = 2;
+}
+message HeartBeatCheker{
+  string isLive = 1;
+}
+message HeartBeatStatus{
+  string isLive = 1;
+}
