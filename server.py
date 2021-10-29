@@ -740,7 +740,7 @@ class Bully:
                 print("Server " + str(self.serverid) +
                       " sends a election message to server " + str(i) + "\n")
         sleep(0.25)
-        if (self.state != "takenover"):
+        if(self.state != "takenover" and self.state != "coordinated"):
             self.send_elected_msg()
             self.setState("coordinator")
             print("Server " + str(self.serverid) +
