@@ -2,7 +2,7 @@
 
 The system consists of two main distributed components: chat servers and chat clients, which can run on different hosts. The architecture of the system is presented below:
 
-https://online.uom.lk/pluginfile.php/443748/mod_page/content/5/In17%20CS4262%20-%20Group%20Project%20%281%29.png
+![Scraping process](Architecture.png)
 
 Chat clients are programs that can connect to at most one chat server; which can be any of the available servers. Chat clients can be used to send requests for creating, deleting, joining and quitting a chat room. They can also be used to send requests to see the list of available chat rooms in the system and the list of client identities currently connected to a given chat room. Finally, they can be used to send chat messages to other chat clients connected to the same chat room.
 
