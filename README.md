@@ -1,5 +1,8 @@
 # Distributed Chat Application
 
+## Technology Stack
+![Scraping process](logos.png)
+
 The system consists of two main distributed components: chat servers and chat clients, which can run on different hosts. The architecture of the system is presented below:
 
 ![Scraping process](Architecture.png)
